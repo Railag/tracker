@@ -25,6 +25,7 @@ public class SplashFragment extends SimpleFragment {
 
         Utils.verifyCameraPermission(getActivity());
         Utils.verifyStoragePermissions(getActivity());
+        Utils.verifySpeechPermission(getActivity());
 
         if (savedInstanceState == null) {
             startLoading();

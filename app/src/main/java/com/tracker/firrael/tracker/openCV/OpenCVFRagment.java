@@ -96,7 +96,6 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
     }
 
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        mIntermediateMat = new Mat();
         mGrey = inputFrame.gray();
         mRgba = inputFrame.rgba();
 
@@ -128,6 +127,7 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
     }
 
     public void onCameraViewStarted(int width, int height) {
+        mIntermediateMat = new Mat();
         mGrey = new Mat(height, width, CvType.CV_8UC4);
         mRgba = new Mat(height, width, CvType.CV_8UC4);
     }
@@ -180,15 +180,17 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
             }
         }
 
-        Imgproc.morphologyEx(mask, morbyte, Imgproc.MORPH_DILATE, kernel);
+        Imgproc.morphologyEx(mask, morbyte, Imgproc.MORPH_DILATE, kernel); // dilate filter
+
         Imgproc.findContours(morbyte, contour2, hierarchy,
                 Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
+
         for (int ind = 0; ind < contour2.size(); ind++) {
             rectan3 = Imgproc.boundingRect(contour2.get(ind));
             Bitmap bmp = null;
             try {
                 Mat croppedPart;
-                croppedPart = mIntermediateMat.submat(rectan3);
+                croppedPart = mIntermediateMat.submat(rectan3); // gain mat from rectan3?
                 bmp = Bitmap.createBitmap(croppedPart.width(), croppedPart.height(), Bitmap.Config.ARGB_8888);
                 matToBitmap(croppedPart, bmp);
             } catch (Exception e) {

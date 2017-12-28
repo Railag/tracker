@@ -18,6 +18,7 @@ import android.view.inputmethod.InputMethodManager;
 public class Utils {
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
     private static final int REQUEST_CAMERA = 2;
+    private static final int REQUEST_SPEECH = 3;
     private static String[] PERMISSIONS_STORAGE = {
             android.Manifest.permission.READ_EXTERNAL_STORAGE,
             android.Manifest.permission.WRITE_EXTERNAL_STORAGE
@@ -47,6 +48,20 @@ public class Utils {
                     activity,
                     new String[]{Manifest.permission.CAMERA},
                     REQUEST_CAMERA
+            );
+        }
+    }
+
+    public static void verifySpeechPermission(Activity activity) {
+        // Check if we have write permission
+        int permission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO);
+
+        if (permission != PackageManager.PERMISSION_GRANTED) {
+            // We don't have permission so prompt the user
+            ActivityCompat.requestPermissions(
+                    activity,
+                    new String[]{Manifest.permission.RECORD_AUDIO},
+                    REQUEST_SPEECH
             );
         }
     }

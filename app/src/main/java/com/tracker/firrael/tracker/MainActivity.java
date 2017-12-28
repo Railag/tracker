@@ -152,10 +152,9 @@ public class MainActivity extends AppCompatActivity
         setFragment(SplashFragment.newInstance());
     }
 
-    public  void toStart() {
-         setFragment(OpenCVFRagment.newInstance());
+    public void toStart() {
+        //     setFragment(OpenCVFRagment.newInstance());
     }
-
 
 
     @Override
@@ -226,7 +225,16 @@ public class MainActivity extends AppCompatActivity
 
                 @Override
                 public void onError(int error) {
-
+                    switch (error) {
+                        case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
+                            Log.i(TAG, "ERROR_SPEECH_TIMEOUT");
+                            break;
+                        case SpeechRecognizer.ERROR_NO_MATCH:
+                            Log.i(TAG, "ERROR_NO_MATCH");
+                            break;
+                        default:
+                            Log.i(TAG, "Error code " + error);
+                    }
                 }
 
                 @Override
@@ -245,59 +253,14 @@ public class MainActivity extends AppCompatActivity
                 }
             });
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-            recognizer.setRecognitionListener(new RecognitionListener() {
-                @Override
-                public void onReadyForSpeech(Bundle params) {
 
-                }
-
-                @Override
-                public void onBeginningOfSpeech() {
-
-                }
-
-                @Override
-                public void onRmsChanged(float rmsdB) {
-
-                }
-
-                @Override
-                public void onBufferReceived(byte[] buffer) {
-
-                }
-
-                @Override
-                public void onEndOfSpeech() {
-
-                }
-
-                @Override
-                public void onError(int error) {
-
-                }
-
-                @Override
-                public void onResults(Bundle results) {
-
-                }
-
-                @Override
-                public void onPartialResults(Bundle partialResults) {
-
-                }
-
-                @Override
-                public void onEvent(int eventType, Bundle params) {
-
-                }
-            });
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
             intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Hello, How can I help you?");
             recognizer.startListening(intent);
         }
 
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        DrawerLayout drawer = findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
     }
