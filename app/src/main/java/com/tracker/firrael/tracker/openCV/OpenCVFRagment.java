@@ -39,7 +39,7 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
 
     private final static String TAG = OpenCVFRagment.class.getSimpleName();
 
-    private final static Scalar CONTOUR_COLOR = new Scalar(30, 30, 30, 30);
+    private final static Scalar CONTOUR_COLOR = Scalar.all(100);
 
     public static OpenCVFRagment newInstance() {
 
@@ -51,6 +51,7 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
     }
 
     private Tesseract tesseract;
+    private MSER detector;
     private JavaCameraView mOpenCVCameraView;
     private Mat mGrey, mRgba, mIntermediateMat;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(getActivity()) {
@@ -81,11 +82,15 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
         getMainActivity().hideToolbar();
 
         tesseract = new Tesseract(getActivity());
+        detector = MSER.create();
     }
 
     @Override
     protected void initView(View v) {
         mOpenCVCameraView = v.findViewById(R.id.javaCameraView);
+        mOpenCVCameraView.setOnClickListener(v1 -> {
+            detectText();
+        });
 
         mOpenCVCameraView.setVisibility(View.VISIBLE);
         mOpenCVCameraView.setCvCameraViewListener(this);
@@ -98,8 +103,9 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         mGrey = inputFrame.gray();
         mRgba = inputFrame.rgba();
+        mIntermediateMat = mRgba;
 
-        detectText();
+    //    detectText();
         return mRgba;
     }
 
@@ -114,7 +120,7 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
     public void onResume() {
         super.onResume();
         if (!OpenCVLoader.initDebug()) {
-            OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_1_0, getActivity(), mLoaderCallback);
+            OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_4_0, getActivity(), mLoaderCallback);
         } else {
             mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
         }
@@ -151,12 +157,10 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
 
         Rect rectan3;
         //
-    //    FeatureDetector detector = FeatureDetector
-    //            .create(FeatureDetector.MSER);
-        MSER detector = MSER.create();
+
         detector.detect(mGrey, keypoint);
         listpoint = keypoint.toList();
-        //
+
         for (int i = 0; i < listpoint.size(); i++) {
             kpoint = listpoint.get(i);
             rectanx1 = (int) (kpoint.pt.x - 0.5 * kpoint.size);
@@ -187,6 +191,8 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
 
         for (int ind = 0; ind < contour2.size(); ind++) {
             rectan3 = Imgproc.boundingRect(contour2.get(ind));
+            Imgproc.rectangle(mRgba, rectan3.br(), rectan3.tl(),
+                    CONTOUR_COLOR);
             Bitmap bmp = null;
             try {
                 Mat croppedPart;
@@ -198,6 +204,7 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
             }
             if (bmp != null) {
                 String result = recognize(bmp);
+                bmp.recycle();
                 Log.i(TAG, "Result: " + result);
             }
         }

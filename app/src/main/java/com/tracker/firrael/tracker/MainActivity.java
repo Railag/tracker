@@ -153,7 +153,7 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void toStart() {
-        //     setFragment(OpenCVFRagment.newInstance());
+        setFragment(OpenCVFRagment.newInstance());
     }
 
 
