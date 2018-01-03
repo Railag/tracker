@@ -1,4 +1,4 @@
-package com.tracker.firrael.tracker.base;
+package com.firrael.tracker.base;
 
 import android.app.Fragment;
 import android.os.Bundle;
@@ -9,8 +9,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
-import com.tracker.firrael.tracker.App;
-import com.tracker.firrael.tracker.MainActivity;
+import com.firrael.tracker.App;
+import com.firrael.tracker.MainActivity;
 
 /**
  * Created by Railag on 19.03.2017.

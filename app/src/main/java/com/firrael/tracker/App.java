@@ -1,8 +1,10 @@
-package com.tracker.firrael.tracker;
+package com.firrael.tracker;
 
 import android.app.Application;
 
 import java.lang.ref.WeakReference;
+
+import io.realm.Realm;
 
 public class App extends Application {
     public static final String PREFS = "prefs";
@@ -16,4 +18,12 @@ public class App extends Application {
     public static MainActivity getMainActivity() {
         return activityRef != null ? activityRef.get() : null;
     }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Realm.init(this);
+    }
+
+
 }

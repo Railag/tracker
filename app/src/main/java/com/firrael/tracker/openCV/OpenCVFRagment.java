@@ -1,15 +1,15 @@
-package com.tracker.firrael.tracker.openCV;
+package com.firrael.tracker.openCV;
 
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Toast;
 
-import com.tracker.firrael.tracker.R;
-import com.tracker.firrael.tracker.Utils;
-import com.tracker.firrael.tracker.base.SimpleFragment;
-import com.tracker.firrael.tracker.tesseract.Tesseract;
+import com.firrael.tracker.R;
+import com.firrael.tracker.base.SimpleFragment;
+import com.firrael.tracker.tesseract.Tesseract;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
@@ -28,6 +28,11 @@ import org.opencv.features2d.MSER;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import rx.Emitter;
+import rx.Observable;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.schedulers.Schedulers;
 
 import static org.opencv.android.Utils.matToBitmap;
 
@@ -89,23 +94,23 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
     protected void initView(View v) {
         mOpenCVCameraView = v.findViewById(R.id.javaCameraView);
         mOpenCVCameraView.setOnClickListener(v1 -> {
-            detectText();
+            if (tesseract.isAvailable()) {
+                detectTextAsync();
+            } else {
+                Toast.makeText(getActivity(), "Wait till previous recognition is finished", Toast.LENGTH_SHORT).show();
+            }
         });
 
         mOpenCVCameraView.setVisibility(View.VISIBLE);
         mOpenCVCameraView.setCvCameraViewListener(this);
     }
 
-    public String recognize(Bitmap bitmap) {
-        return tesseract.getOCRResult(bitmap);
-    }
-
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         mGrey = inputFrame.gray();
         mRgba = inputFrame.rgba();
-        mIntermediateMat = mRgba;
+        mIntermediateMat = mGrey;
 
-    //    detectText();
+        //    detectRegions();
         return mRgba;
     }
 
@@ -138,7 +143,26 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
         mRgba = new Mat(height, width, CvType.CV_8UC4);
     }
 
-    private void detectText() {
+    public void detectTextAsync() {
+        List<Bitmap> regions = detectRegions();
+
+        Observable<List<String>> observable = tesseract.getOCRResult(regions);
+
+        observable
+                .subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(this::onSuccess, this::onError);
+    }
+
+    private void onError(Throwable throwable) {
+        throwable.printStackTrace();
+    }
+
+    private void onSuccess(List<String> s) {
+        Log.i(TAG, "Results: " + s);
+    }
+
+    private List<Bitmap> detectRegions() {
         MatOfKeyPoint keypoint = new MatOfKeyPoint();
         List<KeyPoint> listpoint;
         KeyPoint kpoint;
@@ -189,6 +213,8 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
         Imgproc.findContours(morbyte, contour2, hierarchy,
                 Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
 
+        List<Bitmap> bitmapsToRecognize = new ArrayList<>();
+
         for (int ind = 0; ind < contour2.size(); ind++) {
             rectan3 = Imgproc.boundingRect(contour2.get(ind));
             Imgproc.rectangle(mRgba, rectan3.br(), rectan3.tl(),
@@ -203,11 +229,14 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
                 Log.d(TAG, "cropped part data error " + e.getMessage());
             }
             if (bmp != null) {
-                String result = recognize(bmp);
-                bmp.recycle();
-                Log.i(TAG, "Result: " + result);
+                //    recognize(bmp);
+                bitmapsToRecognize.add(bmp);
+                //bmp.recycle();
+                //Log.i(TAG, "Result: " + result);
             }
         }
+
+        return bitmapsToRecognize;
     }
 
 
@@ -225,6 +254,4 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
     public void onCameraViewStopped() {
         Log.i(TAG, "onCameraViewStopped called");
     }
-
-
 }

@@ -1,4 +1,4 @@
-package com.tracker.firrael.tracker.tesseract;
+package com.firrael.tracker.tesseract;
 
 import android.content.Context;
 import android.content.res.AssetManager;
@@ -12,6 +12,13 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+import rx.Emitter;
+import rx.Observable;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.schedulers.Schedulers;
 
 /**
  * Created by railag on 27.12.2017.
@@ -24,13 +31,15 @@ public class Tesseract {
     private TessBaseAPI mTess;
     Context context;
 
+    private boolean available = true;
+
     public Tesseract(Context context) {
         this.context = context;
         datapath = Environment.getExternalStorageDirectory() + "/ocrctz/";
         File dir = new File(datapath + "/tessdata/");
         File file = new File(datapath + "/tessdata/" + "eng.traineddata");
         if (!file.exists()) {
-            Log.d("mylog", "in file doesn't exist");
+            Log.d(TAG, "in file doesn't exist");
             dir.mkdirs();
             copyFile(context);
         }
@@ -44,10 +53,20 @@ public class Tesseract {
         mTess.stop();
     }
 
-    public String getOCRResult(Bitmap bitmap) {
-        mTess.setImage(bitmap);
-        String result = mTess.getUTF8Text();
-        return result;
+    public Observable<List<String>> getOCRResult(List<Bitmap> bitmaps) {
+        available = false;
+
+        return Observable.create(objectEmitter -> {
+            List<String> results = new ArrayList<>();
+            for (Bitmap b : bitmaps) {
+                mTess.setImage(b);
+                String result = mTess.getUTF8Text();
+                results.add(result);
+            }
+            objectEmitter.onNext(results);
+            objectEmitter.onCompleted();
+            available = true;
+        }, Emitter.BackpressureMode.LATEST);
     }
 
     public void onDestroy() {
@@ -69,6 +88,10 @@ public class Tesseract {
         } catch (Exception e) {
             Log.d(TAG, "couldn't copy with the following error : " + e.toString());
         }
+    }
+
+    public boolean isAvailable() {
+        return available;
     }
 
 }

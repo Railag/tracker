@@ -1,9 +1,9 @@
-package com.tracker.firrael.tracker;
+package com.firrael.tracker;
 
 import android.os.Bundle;
 import android.os.Handler;
 
-import com.tracker.firrael.tracker.base.SimpleFragment;
+import com.firrael.tracker.base.SimpleFragment;
 
 public class SplashFragment extends SimpleFragment {
 

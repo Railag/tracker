@@ -1,4 +1,4 @@
-package com.tracker.firrael.tracker;
+package com.firrael.tracker;
 
 import android.Manifest;
 import android.app.Activity;
