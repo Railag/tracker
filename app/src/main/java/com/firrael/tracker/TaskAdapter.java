@@ -5,6 +5,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import com.firrael.tracker.realm.TaskModel;
 
@@ -35,21 +36,11 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.ViewHolder> {
     public void onBindViewHolder(ViewHolder holder, int position) {
         TaskModel task = tasks.get(position);
 
-        switch (circle) {
-
-            case TOP_RIGHT:
-                holder.circle.setRotation(180);
-                break;
-            case TOP_LEFT:
-                holder.circle.setRotation(90);
-                break;
-            case DOWN_RIGHT:
-                holder.circle.setRotation(270);
-                break;
-            case DOWN_LEFT:
-            default:
-                break;
-        }
+        holder.mTaskName.setText(task.getTask());
+        holder.mStartDate.setText(task.getStartDate());
+        holder.mEndDate.setText(task.getEndDate());
+        // TODO switch image based on status: holder.mStatus.setImageDrawable();
+        // TODO add Glide for caching
     }
 
     @Override
@@ -58,11 +49,17 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.ViewHolder> {
     }
 
     public class ViewHolder extends RecyclerView.ViewHolder {
-        ImageView mCircle;
+        TextView mTaskName;
+        TextView mStartDate;
+        TextView mEndDate;
+        ImageView mStatus;
 
         public ViewHolder(View itemView) {
             super(itemView);
-            mCircle = itemView.findViewById(R.id.)
+            mTaskName = itemView.findViewById(R.id.taskName);
+            mStartDate = itemView.findViewById(R.id.startDate);
+            mEndDate = itemView.findViewById(R.id.endDate);
+            mStatus = itemView.findViewById(R.id.status);
         }
     }
 }

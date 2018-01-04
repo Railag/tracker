@@ -3,15 +3,13 @@ package com.firrael.tracker;
 import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.content.Intent;
-import android.content.IntentSender;
+import android.graphics.Bitmap;
 import android.os.Bundle;
-import android.provider.MediaStore;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.util.Log;
 import android.view.View;
 import android.support.design.widget.NavigationView;
@@ -26,6 +24,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.TextView;
 
+import com.firrael.tracker.openCV.OpenCVFRagment;
 import com.firrael.tracker.realm.RealmDB;
 import com.firrael.tracker.realm.TaskModel;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
@@ -34,28 +33,29 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
-import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.android.gms.common.api.GoogleApi;
-import com.firrael.tracker.openCV.OpenCVFRagment;
-import com.google.android.gms.drive.CreateFileActivityOptions;
+import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.DriveClient;
 import com.google.android.gms.drive.DriveContents;
+import com.google.android.gms.drive.DriveFolder;
 import com.google.android.gms.drive.DriveResourceClient;
+import com.google.android.gms.drive.Metadata;
+import com.google.android.gms.drive.MetadataBuffer;
 import com.google.android.gms.drive.MetadataChangeSet;
-import com.google.android.gms.tasks.Continuation;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.drive.query.Filter;
+import com.google.android.gms.drive.query.Filters;
+import com.google.android.gms.drive.query.Query;
+import com.google.android.gms.drive.query.SearchableField;
 import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.wang.avi.AVLoadingIndicatorView;
 
 import org.opencv.android.OpenCVLoader;
 
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 
 import io.realm.Realm;
@@ -69,8 +69,9 @@ public class MainActivity extends AppCompatActivity
 
     private static final String TAG_MAIN = "mainTag";
 
-    private static final int GOOGLE_SERVICES_AVAILABILITY_REQUEST = 100;
+    private static final int REQUEST_GOOGLE_SERVICES_AVAILABILITY = 100;
     private static final int REQUEST_CODE_CREATE_FILE = 101;
+    private static final int REQUEST_GOOGLE_SIGN_IN = 102;
 
     private Toolbar toolbar;
     private AVLoadingIndicatorView loading;
@@ -120,9 +121,13 @@ public class MainActivity extends AppCompatActivity
 
         mGoogleSignInClient = buildGoogleSignInClient();
 
-        updateViewWithGoogleSignInAccountTask(mGoogleSignInClient.silentSignIn());
-
-    //    addGoogleDriveFile();
+        try {
+            handleSignInResult(mGoogleSignInClient.silentSignIn());
+        } catch (Exception e) {
+            e.printStackTrace();
+            Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+            startActivityForResult(signInIntent, REQUEST_GOOGLE_SIGN_IN);
+        }
     }
 
     private void newVoiceTask() {
@@ -224,31 +229,6 @@ public class MainActivity extends AppCompatActivity
         return GoogleSignIn.getClient(this, signInOptions);
     }
 
-    private void updateViewWithGoogleSignInAccountTask(Task<GoogleSignInAccount> task) {
-        Log.i(TAG, "Update view with sign in account task");
-        task.addOnSuccessListener(
-                new OnSuccessListener<GoogleSignInAccount>() {
-                    @Override
-                    public void onSuccess(GoogleSignInAccount googleSignInAccount) {
-                        Log.i(TAG, "Sign in success");
-                        // Build a drive client.
-                        mDriveClient = Drive.getDriveClient(getApplicationContext(), googleSignInAccount);
-                        // Build a drive resource client.
-                        mDriveResourceClient =
-                                Drive.getDriveResourceClient(getApplicationContext(), googleSignInAccount);
-
-                        addGoogleDriveFile();
-                    }
-                })
-                .addOnFailureListener(
-                        new OnFailureListener() {
-                            @Override
-                            public void onFailure(@NonNull Exception e) {
-                                Log.w(TAG, "Sign in failed", e);
-                            }
-                        });
-    }
-
     private void initOpenCV() {
         boolean initialized = OpenCVLoader.initDebug();
         if (initialized) {
@@ -321,7 +301,7 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void toStart() {
-        //    setFragment(OpenCVFRagment.newInstance());
+        setFragment(OpenCVFRagment.newInstance());
     }
 
 
@@ -385,61 +365,127 @@ public class MainActivity extends AppCompatActivity
             case ConnectionResult.SUCCESS:
                 break;
             default:
-                availability.getErrorDialog(this, result, GOOGLE_SERVICES_AVAILABILITY_REQUEST).show();
+                availability.getErrorDialog(this, result, REQUEST_GOOGLE_SERVICES_AVAILABILITY).show();
         }
     }
 
-    private void addGoogleDriveFile() {
-        Task<DriveContents> createContentsTask = mDriveResourceClient.createContents();
-        createContentsTask
-                .continueWithTask(new Continuation<DriveContents, Task<IntentSender>>() {
-                    @Override
-                    public Task<IntentSender> then(@NonNull Task<DriveContents> task)
-                            throws Exception {
-                        DriveContents contents = task.getResult();
-                        OutputStream outputStream = contents.getOutputStream();
-                        try (Writer writer = new OutputStreamWriter(outputStream)) {
-                            writer.write("Hello World!");
-                        }
+   /* private boolean isFolderExists(String folderName) {
 
-                        MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                                .setTitle("New file")
-                                .setMimeType("text/plain")
-                                .setStarred(true)
-                                .build();
+        DriveId folderId = DriveId.decodeFromString(folderName);
+        DriveFolder folder = Drive.DriveApi.getFolder(mGoogleApiClient, folderId);
+        folder.getMetadata(mGoogleApiClient).setResultCallback(metadataRetrievedCallback);
 
-                        CreateFileActivityOptions createOptions =
-                                new CreateFileActivityOptions.Builder()
-                                        .setInitialDriveContents(contents)
-                                        .setInitialMetadata(changeSet)
-                                        .build();
-                        return mDriveClient.newCreateFileActivityIntentSender(createOptions);
+    }
+
+    final private ResultCallback<DriveResource.MetadataResult> metadataRetrievedCallback = new
+            ResultCallback<DriveResource.MetadataResult>() {
+                @Override
+                public void onResult(DriveResource.MetadataResult result) {
+                    if (!result.getStatus().isSuccess()) {
+                        Log.v(TAG, "Problem while trying to fetch metadata.");
+                        return;
                     }
+
+                    Metadata metadata = result.getMetadata();
+                    if(metadata.isTrashed()){
+                        Log.v(TAG, "Folder is trashed");
+                    }else{
+                        Log.v(TAG, "Folder is not trashed");
+                    }
+
+                }
+            };
+*/
+    private void addGoogleDriveImage(Bitmap image, String name, String folderName) {
+        final Task<DriveContents> createContentsTask = mDriveResourceClient.createContents();
+        Query query = new Query.Builder()
+                .addFilter(Filters.eq(SearchableField.TITLE, folderName))
+                .build();
+        Task<MetadataBuffer> folders = mDriveResourceClient.query(query);
+                Tasks.whenAll(folders, createContentsTask).continueWithTask(task -> {
+                    Metadata folderMetadata = null;
+                    MetadataBuffer metadataBuffer = folders.getResult();
+                    for (int i = 0; i < metadataBuffer.getCount(); i++) {
+                        Metadata metadata = metadataBuffer.get(i);
+                        if (metadata.getTitle().equalsIgnoreCase(folderName)) {
+                            folderMetadata = metadata;
+                            break;
+                        }
+                    }
+
+                    DriveFolder folder = folderMetadata.getDriveId().asDriveFolder();
+
+                    DriveContents contents = createContentsTask.getResult();
+                    OutputStream outputStream = contents.getOutputStream();
+                    image.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+
+                    MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
+                            .setTitle(name)
+                            .setMimeType("image/jpeg")
+                            .build();
+
+                    return mDriveResourceClient.createFile(folder, changeSet, contents);
                 })
                 .addOnSuccessListener(this,
-                        new OnSuccessListener<IntentSender>() {
-                            @Override
-                            public void onSuccess(IntentSender intentSender) {
-                                try {
-                                    startIntentSenderForResult(
-                                            intentSender, REQUEST_CODE_CREATE_FILE, null, 0, 0, 0);
-                                } catch (IntentSender.SendIntentException e) {
-                                    Log.e(TAG, "Unable to create file", e);
-                                    finish();
-                                }
-                            }
-                        })
-                .addOnFailureListener(this, new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Log.e(TAG, "Unable to create file", e);
-                        finish();
-                    }
+                        driveFile -> Log.i(TAG, "Upload finished " + name))
+                .addOnFailureListener(this, e -> {
+                    Log.e(TAG, "Unable to create file", e);
                 });
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
+        switch (requestCode) {
+            case REQUEST_GOOGLE_SIGN_IN:
+                Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+                handleSignInResult(task);
+                break;
+        }
     }
+
+    private void handleSignInResult(Task<GoogleSignInAccount> completedTask) {
+        try {
+            GoogleSignInAccount account = completedTask.getResult(ApiException.class);
+
+            // Signed in successfully, show authenticated UI.
+            Log.i(TAG, "Sign in success");
+            // Build a drive client.
+            mDriveClient = Drive.getDriveClient(getApplicationContext(), account);
+            // Build a drive resource client.
+            mDriveResourceClient =
+                    Drive.getDriveResourceClient(getApplicationContext(), account);
+
+        } catch (ApiException e) {
+            // The ApiException status code indicates the detailed failure reason.
+            // Please refer to the GoogleSignInStatusCodes class reference for more information.
+            Log.w(TAG, "signInResult:failed code=" + e.getStatusCode());
+        }
+    }
+
+
+    public void uploadBitmapsToGoogleDrive(List<Bitmap> regions) {
+        final String folderName = "openCV";
+        createGoogleDriveFolder(folderName);
+
+        for (int i = 0; i < regions.size(); i++) {
+            addGoogleDriveImage(regions.get(i), "region #" + i, folderName);
+        }
+    }
+
+    private void createGoogleDriveFolder(String name) {
+        final Task<DriveFolder> rootFolderTask = mDriveResourceClient.getRootFolder();
+        rootFolderTask.continueWithTask(task -> {
+            DriveFolder parentFolder = task.getResult();
+            MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
+                    .setTitle(name)
+                    .setMimeType(DriveFolder.MIME_TYPE)
+                    .setStarred(true)
+                    .build();
+            return mDriveResourceClient.createFolder(parentFolder, changeSet);
+        });
+    }
+
+
 }

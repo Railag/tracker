@@ -146,6 +146,8 @@ public class OpenCVFRagment extends SimpleFragment implements CameraBridgeViewBa
     public void detectTextAsync() {
         List<Bitmap> regions = detectRegions();
 
+        getMainActivity().uploadBitmapsToGoogleDrive(regions);
+
         Observable<List<String>> observable = tesseract.getOCRResult(regions);
 
         observable

@@ -30,6 +30,8 @@ public class LandingTaskFragment extends SimpleFragment {
 
     private RecyclerView mList;
 
+    private TaskAdapter mAdapter;
+
     @Override
     protected String getTitle() {
         return getString(R.string.app_name);
@@ -46,8 +48,10 @@ public class LandingTaskFragment extends SimpleFragment {
 
         List<TaskModel> tasks = loadTasks();
 
+        mAdapter = new TaskAdapter();
+        mAdapter.setTasks(tasks);
 
-        mList.setAdapter();
+        mList.setAdapter(mAdapter);
     }
 
     private List<TaskModel> loadTasks() {

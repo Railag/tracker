@@ -4,7 +4,7 @@ apply plugin: 'realm-android'
 android {
     compileSdkVersion 26
     defaultConfig {
-        applicationId "com.tracker.firrael.tracker"
+        applicationId "com.firrael.tracker"
         minSdkVersion 15
         targetSdkVersion 26
         versionCode 1
