@@ -33,7 +33,7 @@ public class SplashFragment extends SimpleFragment {
             Handler handler = new Handler();
             handler.postDelayed(() -> {
                 stopLoading();
-                getMainActivity().toStart();
+                getMainActivity().toLanding();
             }, 3500);
         }
     }
