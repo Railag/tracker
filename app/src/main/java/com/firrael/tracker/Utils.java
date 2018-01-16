@@ -16,6 +16,9 @@ import android.view.inputmethod.InputMethodManager;
  */
 
 public class Utils {
+    public final static String DATE_FORMAT = "yyyy-MM-dd hh:mm:ss";
+
+
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
     private static final int REQUEST_CAMERA = 2;
     private static final int REQUEST_SPEECH = 3;

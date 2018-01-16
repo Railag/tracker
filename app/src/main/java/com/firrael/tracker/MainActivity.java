@@ -3,23 +3,22 @@ package com.firrael.tracker;
 import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
-import android.util.Log;
-import android.view.View;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.TextView;
@@ -36,30 +35,17 @@ import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.DriveClient;
-import com.google.android.gms.drive.DriveContents;
-import com.google.android.gms.drive.DriveFolder;
 import com.google.android.gms.drive.DriveResourceClient;
-import com.google.android.gms.drive.Metadata;
-import com.google.android.gms.drive.MetadataBuffer;
-import com.google.android.gms.drive.MetadataChangeSet;
-import com.google.android.gms.drive.query.Filters;
-import com.google.android.gms.drive.query.Query;
-import com.google.android.gms.drive.query.SearchableField;
 import com.google.android.gms.tasks.Task;
-import com.google.android.gms.tasks.Tasks;
 import com.wang.avi.AVLoadingIndicatorView;
 
 import org.opencv.android.OpenCVLoader;
 
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Locale;
 
 import io.realm.Realm;
-
-import static com.google.android.gms.drive.Drive.getDriveClient;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
@@ -78,6 +64,8 @@ public class MainActivity extends AppCompatActivity
     private GoogleSignInClient mGoogleSignInClient;
     private DriveClient mDriveClient;
     private DriveResourceClient mDriveResourceClient;
+
+    private FloatingActionButton mFab;
 
     private Fragment currentFragment;
 
@@ -99,8 +87,7 @@ public class MainActivity extends AppCompatActivity
         toolbar.setNavigationOnClickListener(v -> onBackPressed());
 
 
-        FloatingActionButton fab = findViewById(R.id.fab);
-        fab.setOnClickListener(view -> newVoiceTask());
+        mFab = findViewById(R.id.fab);
 
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
@@ -110,8 +97,6 @@ public class MainActivity extends AppCompatActivity
 
         NavigationView navigationView = findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
-
-        hideToolbar();
 
         initOpenCV();
 
@@ -126,97 +111,6 @@ public class MainActivity extends AppCompatActivity
             Intent signInIntent = mGoogleSignInClient.getSignInIntent();
             startActivityForResult(signInIntent, REQUEST_GOOGLE_SIGN_IN);
         }
-    }
-
-    private void newVoiceTask() {
-        SpeechRecognizer recognizer = SpeechRecognizer.createSpeechRecognizer(this);
-        recognizer.setRecognitionListener(new RecognitionListener() {
-            @Override
-            public void onReadyForSpeech(Bundle params) {
-                Log.i(TAG, "onReadyForSpeech");
-            }
-
-            @Override
-            public void onBeginningOfSpeech() {
-                Log.i(TAG, "onBeginningOfSpeech");
-            }
-
-            @Override
-            public void onRmsChanged(float rmsdB) {
-                //            Log.i(TAG, "onRmsChanged " + rmsdB);
-            }
-
-            @Override
-            public void onBufferReceived(byte[] buffer) {
-                Log.i(TAG, "onBufferReceived " + new String(buffer));
-            }
-
-            @Override
-            public void onEndOfSpeech() {
-                Log.i(TAG, "onEndOfSpeech");
-            }
-
-            @Override
-            public void onError(int error) {
-                switch (error) {
-                    case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
-                        Log.i(TAG, "ERROR_SPEECH_TIMEOUT");
-                        break;
-                    case SpeechRecognizer.ERROR_NO_MATCH:
-                        Log.i(TAG, "ERROR_NO_MATCH");
-                        break;
-                    default:
-                        Log.i(TAG, "Error code " + error);
-                }
-            }
-
-            @Override
-            public void onResults(Bundle results) {
-                ArrayList<String> result = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                float[] scores = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES);
-
-                Log.i(TAG, "onResults " + result);
-                Log.i(TAG, "onResults scores: " + Arrays.toString(scores));
-
-                if (result != null && result.size() > 0) {
-                    saveNewTask(result.get(0)); // send best option
-                }
-            }
-
-            @Override
-            public void onPartialResults(Bundle partialResults) {
-                Log.i(TAG, "onPartialResults " + partialResults);
-            }
-
-            @Override
-            public void onEvent(int eventType, Bundle params) {
-                Log.i(TAG, "onEvent " + eventType + params);
-            }
-        });
-        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        //intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru_RU");
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
-        //    intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Hello, How can I help you?");
-        recognizer.startListening(intent);
-    }
-
-    private void saveNewTask(String task) {
-        Realm realm = RealmDB.get();
-        TaskModel taskModel = new TaskModel(task);
-        realm.executeTransaction(new Realm.Transaction() {
-            @Override
-            public void execute(@NonNull Realm realm) {
-                // This will create a new object in Realm or throw an exception if the
-                // object already exists (same primary key)
-                // realm.copyToRealm(obj);
-
-                // This will update an existing object with the same primary key
-                // or create a new object if an object with no primary key = 42
-                realm.copyToRealmOrUpdate(taskModel);
-            }
-        });
     }
 
     private GoogleSignInClient buildGoogleSignInClient() {
@@ -303,6 +197,18 @@ public class MainActivity extends AppCompatActivity
         startActivity(intent);
     }
 
+    public void toNewTask() {
+        setFragment(NewTaskFragment.newInstance());
+    }
+
+    public void toAttach(String taskName) {
+        setFragment(AttachFragment.newInstance(taskName));
+    }
+
+    public void toEditTask(TaskModel task) {
+        setFragment(EditTaskFragment.newInstance(task));
+    }
+
     public void toLanding() {
         setFragment(LandingTaskFragment.newInstance());
     }
@@ -336,13 +242,11 @@ public class MainActivity extends AppCompatActivity
         // Handle navigation view item clicks here.
         int id = item.getItemId();
 
-        if (id == R.id.nav_camera) {
-            // Handle the camera action
-        } else if (id == R.id.nav_gallery) {
-
-        } else if (id == R.id.nav_slideshow) {
-
-        } else if (id == R.id.nav_manage) {
+        if (id == R.id.nav_opencv) {
+            toOpenCV();
+        } else if (id == R.id.nav_add_task) {
+            toNewTask();
+        }  else if (id == R.id.nav_manage) {
 
         } else if (id == R.id.nav_share) {
 
@@ -433,8 +337,22 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
+    public void setupFab(View.OnClickListener listener) {
+        if (mFab != null) {
+            showFab();
+            mFab.setOnClickListener(listener);
+        }
+    }
 
+    private void showFab() {
+        if (mFab != null) {
+            mFab.setVisibility(View.VISIBLE);
+        }
+    }
 
-
-
+    public void hideFab() {
+        if (mFab != null) {
+            mFab.setVisibility(View.GONE);
+        }
+    }
 }

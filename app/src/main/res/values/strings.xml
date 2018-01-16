@@ -5,4 +5,13 @@
     <string name="navigation_drawer_close">Close navigation drawer</string>
 
     <string name="action_settings">Settings</string>
+    <string name="add_new_task">Add New Task</string>
+    <string name="opencv_scanning">OpenCV Scanning</string>
+    <string name="settings">Settings</string>
+    <string name="other">Other</string>
+    <string name="new_task_title">New Task</string>
+    <string name="enter_task_name">Enter taskName name</string>
+    <string name="attach_document">Attach Document</string>
+    <string name="done">done</string>
+    <string name="edit_task">Edit Task</string>
 </resources>

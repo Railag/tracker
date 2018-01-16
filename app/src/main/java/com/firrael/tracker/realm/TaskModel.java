@@ -1,14 +1,30 @@
 package com.firrael.tracker.realm;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
+import com.firrael.tracker.Utils;
+
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 import io.realm.RealmObject;
-import io.realm.annotations.Ignore;
+import io.realm.annotations.PrimaryKey;
 
 /**
  * Created by railag on 29.12.2017.
  */
 
-public class TaskModel extends RealmObject {
-    private String task;
+public class TaskModel extends RealmObject implements Parcelable {
+    public final static int STATUS_IN_PROGRESS = 0;
+    public final static int STATUS_FINISHED = 1;
+
+    @PrimaryKey
+    private int id;
+
+    private String taskName;
     private String startDate;
     private String endDate;
     private int status;
@@ -16,16 +32,59 @@ public class TaskModel extends RealmObject {
     public TaskModel() {
     }
 
-    public TaskModel(String task) {
-        this.task = task;
+    public TaskModel(int id, String taskName, String startDate, int status) {
+        this.id = id;
+        this.taskName = taskName;
+        this.startDate = startDate;
+        this.status = status;
     }
 
-    public String getTask() {
-        return task;
+    public void done() {
+        this.status = STATUS_FINISHED;
+        DateFormat formatter = new SimpleDateFormat(Utils.DATE_FORMAT, Locale.getDefault());
+        this.endDate = formatter.format(new Date());
     }
 
-    public void setTask(String task) {
-        this.task = task;
+    protected TaskModel(Parcel in) {
+        id = in.readInt();
+        taskName = in.readString();
+        startDate = in.readString();
+        endDate = in.readString();
+        status = in.readInt();
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeInt(id);
+        dest.writeString(taskName);
+        dest.writeString(startDate);
+        dest.writeString(endDate);
+        dest.writeInt(status);
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    public static final Creator<TaskModel> CREATOR = new Creator<TaskModel>() {
+        @Override
+        public TaskModel createFromParcel(Parcel in) {
+            return new TaskModel(in);
+        }
+
+        @Override
+        public TaskModel[] newArray(int size) {
+            return new TaskModel[size];
+        }
+    };
+
+    public String getTaskName() {
+        return taskName;
+    }
+
+    public void setTaskName(String taskName) {
+        this.taskName = taskName;
     }
 
     public String getStartDate() {
@@ -50,5 +109,13 @@ public class TaskModel extends RealmObject {
 
     public void setStatus(int status) {
         this.status = status;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 }

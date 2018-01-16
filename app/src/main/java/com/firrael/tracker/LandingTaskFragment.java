@@ -1,6 +1,7 @@
 package com.firrael.tracker;
 
 import android.os.Bundle;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 
@@ -8,10 +9,10 @@ import com.firrael.tracker.base.SimpleFragment;
 import com.firrael.tracker.realm.RealmDB;
 import com.firrael.tracker.realm.TaskModel;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import io.realm.Realm;
+import io.realm.RealmResults;
 
 /**
  * Created by railag on 04.01.2018.
@@ -46,22 +47,26 @@ public class LandingTaskFragment extends SimpleFragment {
     protected void initView(View v) {
         mList = v.findViewById(R.id.taskList);
 
+        getMainActivity().showToolbar();
+
+        LinearLayoutManager linearLayoutManager = new LinearLayoutManager(getActivity(), LinearLayoutManager.VERTICAL, false);
+        mList.setLayoutManager(linearLayoutManager);
+
         List<TaskModel> tasks = loadTasks();
 
         mAdapter = new TaskAdapter();
-        mAdapter.setTasks(tasks);
+
+        TaskAdapter.EditListener listener = task -> getMainActivity().toEditTask(task);
+        mAdapter.setTasks(tasks, listener);
 
         mList.setAdapter(mAdapter);
+
+        getMainActivity().setupFab(v1 -> getMainActivity().toNewTask());
     }
 
     private List<TaskModel> loadTasks() {
         Realm realm = RealmDB.get();
-        // TODO fetch recent tasks
-
-        List<TaskModel> tasks = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            tasks.add(new TaskModel("task #" + i));
-        }
+        final RealmResults<TaskModel> tasks = realm.where(TaskModel.class).findAll().sort("startDate");
 
         return tasks;
     }

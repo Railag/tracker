@@ -1,0 +1,167 @@
+package com.firrael.tracker;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
+import android.text.Editable;
+import android.text.TextUtils;
+import android.text.TextWatcher;
+import android.util.Log;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.ImageView;
+
+import com.firrael.tracker.base.SimpleFragment;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Locale;
+
+/**
+ * Created by railag on 15.01.2018.
+ */
+
+public class NewTaskFragment extends SimpleFragment {
+
+    private final static String TAG = NewTaskFragment.class.getSimpleName();
+
+    public static NewTaskFragment newInstance() {
+
+        Bundle args = new Bundle();
+
+        NewTaskFragment fragment = new NewTaskFragment();
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+    private EditText mTaskNameEdit;
+    private ImageView mVoiceIcon;
+
+    @Override
+    protected String getTitle() {
+        return getString(R.string.new_task_title);
+    }
+
+    @Override
+    protected int getViewId() {
+        return R.layout.fragment_new_task;
+    }
+
+    @Override
+    protected void initView(View v) {
+        mTaskNameEdit = v.findViewById(R.id.task_name_edit);
+        mVoiceIcon = v.findViewById(R.id.voice_icon);
+
+        mTaskNameEdit.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String name = mTaskNameEdit.getText().toString();
+                boolean isValid = !TextUtils.isEmpty(name) && name.length() > 0;
+                toggleFab(isValid);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+
+        mVoiceIcon.setOnClickListener(v1 -> newVoiceTask());
+    }
+
+    private void toggleFab(boolean isValid) {
+        if (isValid) {
+            getMainActivity().setupFab(view -> next());
+        } else {
+            getMainActivity().hideFab();
+        }
+    }
+
+    private void next() {
+        String taskName = mTaskNameEdit.getText().toString();
+        getMainActivity().toAttach(taskName);
+    }
+
+    private void newVoiceTask() {
+        SpeechRecognizer recognizer = SpeechRecognizer.createSpeechRecognizer(getActivity());
+        recognizer.setRecognitionListener(new RecognitionListener() {
+            @Override
+            public void onReadyForSpeech(Bundle params) {
+                Log.i(TAG, "onReadyForSpeech");
+            }
+
+            @Override
+            public void onBeginningOfSpeech() {
+                Log.i(TAG, "onBeginningOfSpeech");
+            }
+
+            @Override
+            public void onRmsChanged(float rmsdB) {
+                //            Log.i(TAG, "onRmsChanged " + rmsdB);
+            }
+
+            @Override
+            public void onBufferReceived(byte[] buffer) {
+                Log.i(TAG, "onBufferReceived " + new String(buffer));
+            }
+
+            @Override
+            public void onEndOfSpeech() {
+                Log.i(TAG, "onEndOfSpeech");
+            }
+
+            @Override
+            public void onError(int error) {
+                switch (error) {
+                    case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
+                        Log.i(TAG, "ERROR_SPEECH_TIMEOUT");
+                        break;
+                    case SpeechRecognizer.ERROR_NO_MATCH:
+                        Log.i(TAG, "ERROR_NO_MATCH");
+                        break;
+                    default:
+                        Log.i(TAG, "Error code " + error);
+                }
+            }
+
+            @Override
+            public void onResults(Bundle results) {
+                ArrayList<String> result = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                float[] scores = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES);
+
+                Log.i(TAG, "onResults " + result);
+                Log.i(TAG, "onResults scores: " + Arrays.toString(scores));
+
+                if (result != null && result.size() > 0) {
+                    setResult(result.get(0)); // send best option
+                }
+            }
+
+            @Override
+            public void onPartialResults(Bundle partialResults) {
+                Log.i(TAG, "onPartialResults " + partialResults);
+            }
+
+            @Override
+            public void onEvent(int eventType, Bundle params) {
+                Log.i(TAG, "onEvent " + eventType + params);
+            }
+        });
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        //intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru_RU");
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+        //    intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Hello, How can I help you?");
+        recognizer.startListening(intent);
+    }
+
+    private void setResult(String task) {
+        mTaskNameEdit.setText(task);
+    }
+}

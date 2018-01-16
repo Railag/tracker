@@ -5,25 +5,22 @@
 
     <group android:checkableBehavior="single">
         <item
-            android:id="@+id/nav_camera"
-            android:icon="@drawable/ic_menu_camera"
-            android:title="Import" />
-        <item
-            android:id="@+id/nav_gallery"
+            android:id="@+id/nav_add_task"
             android:icon="@drawable/ic_menu_gallery"
-            android:title="Gallery" />
+            android:title="@string/add_new_task" />
         <item
-            android:id="@+id/nav_slideshow"
-            android:icon="@drawable/ic_menu_slideshow"
-            android:title="Slideshow" />
-        <item
-            android:id="@+id/nav_manage"
-            android:icon="@drawable/ic_menu_manage"
-            android:title="Tools" />
+            android:id="@+id/nav_opencv"
+            android:icon="@drawable/ic_menu_camera"
+            android:title="@string/opencv_scanning" />
+
     </group>
 
-    <item android:title="Communicate">
+    <item android:title="@string/other">
         <menu>
+            <item
+                android:id="@+id/nav_manage"
+                android:icon="@drawable/ic_menu_manage"
+                android:title="@string/settings" />
             <item
                 android:id="@+id/nav_share"
                 android:icon="@drawable/ic_menu_share"
