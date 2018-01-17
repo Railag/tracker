@@ -95,7 +95,7 @@ public class EditTaskFragment extends SimpleFragment {
         mTakePictureIcon.setOnClickListener(v1 -> takePicture());
         mScanDocumentIcon.setOnClickListener(v1 -> scanDocument());
 
-        getMainActivity().setupFab(view -> saveUpdates());
+        getMainActivity().setupFab(view -> saveUpdates(), MainActivity.FAB_DONE);
 
         Bundle args = getArguments();
         if (args != null && args.containsKey(KEY_TASK)) {

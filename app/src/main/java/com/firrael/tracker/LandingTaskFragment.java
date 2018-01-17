@@ -61,7 +61,7 @@ public class LandingTaskFragment extends SimpleFragment {
 
         mList.setAdapter(mAdapter);
 
-        getMainActivity().setupFab(v1 -> getMainActivity().toNewTask());
+        getMainActivity().setupFab(v1 -> getMainActivity().toNewTask(), MainActivity.FAB_NEW);
     }
 
     private List<TaskModel> loadTasks() {

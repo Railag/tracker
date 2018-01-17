@@ -3,6 +3,7 @@ package com.firrael.tracker;
 import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.content.Intent;
+import android.content.res.Resources;
 import android.os.Bundle;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
@@ -10,10 +11,12 @@ import android.speech.SpeechRecognizer;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.AppCompatDrawableManager;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
@@ -337,10 +340,28 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
-    public void setupFab(View.OnClickListener listener) {
+    public final static int FAB_NEW = 0;
+    public final static int FAB_NEXT = 1;
+    public final static int FAB_DONE = 2;
+    public void setupFab(View.OnClickListener listener, int fabState) {
         if (mFab != null) {
             showFab();
             mFab.setOnClickListener(listener);
+
+
+            int fabDrawableId = R.drawable.ic_menu_send;
+            switch (fabState) {
+                case FAB_NEW:
+                    fabDrawableId = R.drawable.ic_add_black_24dp;
+                    break;
+                case FAB_NEXT:
+                    fabDrawableId = R.drawable.ic_forward_black_24dp;
+                    break;
+                case FAB_DONE:
+                    fabDrawableId = R.drawable.ic_done_black_24dp;
+                    break;
+            }
+            mFab.setImageDrawable(ContextCompat.getDrawable(this, fabDrawableId));
         }
     }
 

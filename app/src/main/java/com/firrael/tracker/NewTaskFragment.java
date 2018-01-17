@@ -9,9 +9,12 @@ import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import com.firrael.tracker.base.SimpleFragment;
 
@@ -54,6 +57,8 @@ public class NewTaskFragment extends SimpleFragment {
         mTaskNameEdit = v.findViewById(R.id.task_name_edit);
         mVoiceIcon = v.findViewById(R.id.voice_icon);
 
+        toggleFab(false);
+
         mTaskNameEdit.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -71,12 +76,25 @@ public class NewTaskFragment extends SimpleFragment {
             }
         });
 
+        mTaskNameEdit.setOnEditorActionListener((v12, actionId, event) -> {
+            boolean handled = false;
+            if (actionId == EditorInfo.IME_ACTION_NEXT) {
+                String name = mTaskNameEdit.getText().toString();
+                boolean isValid = !TextUtils.isEmpty(name) && name.length() > 0;
+                if (isValid) {
+                    next();
+                    handled = true;
+                }
+            }
+            return handled;
+        });
+
         mVoiceIcon.setOnClickListener(v1 -> newVoiceTask());
     }
 
     private void toggleFab(boolean isValid) {
         if (isValid) {
-            getMainActivity().setupFab(view -> next());
+            getMainActivity().setupFab(view -> next(), MainActivity.FAB_NEXT);
         } else {
             getMainActivity().hideFab();
         }

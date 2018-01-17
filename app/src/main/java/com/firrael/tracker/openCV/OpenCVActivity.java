@@ -112,11 +112,16 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
 
+        // C++: static Ptr_MSER create(int _delta = 5, int _min_area = 60, int _max_area = 14400, double _max_variation = 0.25, double _min_diversity = .2, int _max_evolution = 200, double _area_threshold = 1.01, double _min_margin = 0.003, int _edge_blur_size = 5)
+
         mTesseract = new Tesseract(this);
         mDetector = MSER.create();
-        mDetector.setMinArea(120);
-        mDetector.setMaxArea(14400);
-
+    // TODO use all features    mDetector = MSER.create(5, 60, 14400, 0.25,
+    //            0.2, 200, 1.01, 0.003, 5);
+    //    mDetector.setMinArea(60);
+    //    mDetector.setMaxArea(14400);
+    //    mDetector.setDelta(5);
+    // TODO ???    mDetector.setPass2Only();
 
         mDriveResourceClient = App.getDrive();
 

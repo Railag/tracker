@@ -91,7 +91,7 @@ public class AttachFragment extends SimpleFragment {
         mTakePictureIcon.setOnClickListener(v1 -> takePicture());
         mScanDocumentIcon.setOnClickListener(v1 -> scanDocument());
 
-        getMainActivity().setupFab(view -> done());
+        getMainActivity().setupFab(view -> done(), MainActivity.FAB_DONE);
 
         Bundle args = getArguments();
         if (args != null) {
