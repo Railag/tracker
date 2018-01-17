@@ -54,8 +54,7 @@ public class TaskModel extends RealmObject implements Parcelable {
         endDate = in.readString();
         status = in.readInt();
         imageUrl = in.readString();
-        openCVScanData = new RealmList<>();
-        openCVScanData.addAll(in.createStringArrayList());
+        in.readStringList(openCVScanData);
     }
 
     @Override
