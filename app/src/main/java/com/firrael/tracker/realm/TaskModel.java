@@ -2,14 +2,18 @@ package com.firrael.tracker.realm;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.text.TextUtils;
 
 import com.firrael.tracker.Utils;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
+import io.realm.RealmList;
 import io.realm.RealmObject;
 import io.realm.annotations.PrimaryKey;
 
@@ -29,6 +33,10 @@ public class TaskModel extends RealmObject implements Parcelable {
     private String endDate;
     private int status;
 
+    // attached content
+    private String imageUrl;
+    private RealmList<String> openCVScanData;
+
     public TaskModel() {
     }
 
@@ -39,18 +47,15 @@ public class TaskModel extends RealmObject implements Parcelable {
         this.status = status;
     }
 
-    public void done() {
-        this.status = STATUS_FINISHED;
-        DateFormat formatter = new SimpleDateFormat(Utils.DATE_FORMAT, Locale.getDefault());
-        this.endDate = formatter.format(new Date());
-    }
-
     protected TaskModel(Parcel in) {
         id = in.readInt();
         taskName = in.readString();
         startDate = in.readString();
         endDate = in.readString();
         status = in.readInt();
+        imageUrl = in.readString();
+        openCVScanData = new RealmList<>();
+        openCVScanData.addAll(in.createStringArrayList());
     }
 
     @Override
@@ -60,6 +65,8 @@ public class TaskModel extends RealmObject implements Parcelable {
         dest.writeString(startDate);
         dest.writeString(endDate);
         dest.writeInt(status);
+        dest.writeString(imageUrl);
+        dest.writeStringList(openCVScanData);
     }
 
     @Override
@@ -78,6 +85,12 @@ public class TaskModel extends RealmObject implements Parcelable {
             return new TaskModel[size];
         }
     };
+
+    public void done() {
+        this.status = STATUS_FINISHED;
+        DateFormat formatter = new SimpleDateFormat(Utils.DATE_FORMAT, Locale.getDefault());
+        this.endDate = formatter.format(new Date());
+    }
 
     public String getTaskName() {
         return taskName;
@@ -117,5 +130,30 @@ public class TaskModel extends RealmObject implements Parcelable {
 
     public void setId(int id) {
         this.id = id;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
+    public List<String> getOpenCVScanData() {
+        return openCVScanData;
+    }
+
+    public void setOpenCVScanData(List<String> openCVScanData) {
+        this.openCVScanData = new RealmList<>();
+        this.openCVScanData.addAll(openCVScanData);
+    }
+
+    public boolean hasImage() {
+        return !TextUtils.isEmpty(imageUrl);
+    }
+
+    public boolean hasScan() {
+        return openCVScanData != null && openCVScanData.size() > 0;
     }
 }

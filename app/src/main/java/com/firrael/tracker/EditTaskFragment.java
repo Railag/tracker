@@ -1,18 +1,36 @@
 package com.firrael.tracker;
 
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.support.v4.content.FileProvider;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
 import com.firrael.tracker.base.SimpleFragment;
+import com.firrael.tracker.openCV.OpenCVActivity;
 import com.firrael.tracker.realm.RealmDB;
 import com.firrael.tracker.realm.TaskModel;
 
-import io.realm.Realm;
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+import static android.app.Activity.RESULT_OK;
+import static com.firrael.tracker.AttachFragment.REQUEST_DOCUMENT_SCAN;
+import static com.firrael.tracker.AttachFragment.REQUEST_IMAGE_CAPTURE;
 
 /**
  * Created by railag on 16.01.2018.
@@ -43,6 +61,15 @@ public class EditTaskFragment extends SimpleFragment {
     private TextView mStartDateView;
     private TextView mEndDateView;
     private Button mDoneButton;
+    private ImageView mTakePicturePreview;
+    private TextView mScanDataPreview;
+
+    private boolean mHasPicture;
+    private boolean mHasScan;
+
+    private String mCurrentPhotoPath;
+
+    private List<String> mCurrentScanData;
 
     @Override
     protected String getTitle() {
@@ -62,6 +89,8 @@ public class EditTaskFragment extends SimpleFragment {
         mStartDateView = v.findViewById(R.id.start_date);
         mEndDateView = v.findViewById(R.id.end_date);
         mDoneButton = v.findViewById(R.id.done_button);
+        mTakePicturePreview = v.findViewById(R.id.take_picture_preview);
+        mScanDataPreview = v.findViewById(R.id.scan_data_preview);
 
         mTakePictureIcon.setOnClickListener(v1 -> takePicture());
         mScanDocumentIcon.setOnClickListener(v1 -> scanDocument());
@@ -101,40 +130,121 @@ public class EditTaskFragment extends SimpleFragment {
                 mDoneButton.setVisibility(View.GONE);
                 break;
         }
-    }
 
-    private void takePicture() {
-        // TODO
-    }
+        if (mTask.hasImage()) {
+            loadImage(mTask.getImageUrl());
+        }
 
-    private void scanDocument() {
-        // TODO add handling
-
-        getMainActivity().toOpenCV();
+        if (mTask.hasScan()) {
+            loadScan(mTask.getOpenCVScanData());
+        }
     }
 
     private void saveUpdates() {
         String newName = mTaskEdit.getText().toString();
-
 
         RealmDB.get().executeTransaction(realm -> {
             if (!TextUtils.isEmpty(newName)) {
                 mTask.setTaskName(newName);
             }
 
-            boolean hasPicture = false;
-            if (hasPicture) {
-                // TODO add picture to model
+            if (mHasPicture) {
+                if (!TextUtils.isEmpty(mCurrentPhotoPath)) {
+                    mTask.setImageUrl(mCurrentPhotoPath);
+                }
             }
 
-            boolean hasScan = false;
-            if (hasScan) {
-                // TODO add scan to model
+            if (mHasScan) {
+                mTask.setOpenCVScanData(mCurrentScanData);
             }
 
             realm.copyToRealmOrUpdate(mTask);
         });
 
         getMainActivity().toLanding();
+    }
+
+    private void takePicture() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (takePictureIntent.resolveActivity(getActivity().getPackageManager()) != null) {
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                Toast.makeText(getActivity(), R.string.error_photo, Toast.LENGTH_SHORT).show();
+            }
+            if (photoFile != null) {
+                Uri photoURI = FileProvider.getUriForFile(getActivity(),
+                        "com.example.android.fileprovider",
+                        photoFile);
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
+                startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+            }
+        }
+    }
+
+    private File createImageFile() throws IOException {
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        String imageFileName = "JPEG_" + timeStamp + "_";
+        File storageDir = getActivity().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File image = File.createTempFile(
+                imageFileName,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
+
+        mCurrentPhotoPath = image.getAbsolutePath();
+        return image;
+    }
+
+    private void scanDocument() {
+        Intent intent = new Intent(getMainActivity(), OpenCVActivity.class);
+        startActivityForResult(intent, REQUEST_DOCUMENT_SCAN);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
+            if (data != null) {
+                Bundle extras = data.getExtras();
+                if (extras != null) {
+                    Bitmap imageBitmap = (Bitmap) extras.get("data");
+                    mTakePicturePreview.setImageBitmap(imageBitmap);
+                }
+            } else {
+                loadImage(mCurrentPhotoPath);
+                mHasPicture = true;
+            }
+        } else if (requestCode == REQUEST_DOCUMENT_SCAN && resultCode == RESULT_OK) {
+            if (data != null) {
+                Bundle extras = data.getExtras();
+                if (extras != null) {
+                    mCurrentScanData = extras.getStringArrayList(OpenCVActivity.KEY_SCAN_RESULTS);
+                    if (mCurrentScanData != null && mCurrentScanData.size() > 0) {
+                        loadScan(mCurrentScanData);
+                        mHasScan = true;
+                    }
+                }
+            }
+        }
+    }
+
+    private void loadImage(String url) {
+        Uri uri = Uri.fromFile(new File(url));
+        Glide.with(this).load(uri).into(mTakePicturePreview);
+    }
+
+    private void loadScan(List<String> openCVData) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < openCVData.size(); i++) {
+            String line = openCVData.get(i);
+            builder.append("region#");
+            builder.append(i);
+            builder.append(": ");
+            builder.append(line);
+            builder.append("\n");
+        }
+
+        mScanDataPreview.setText(builder.toString());
     }
 }

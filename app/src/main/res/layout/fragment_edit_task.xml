@@ -6,8 +6,7 @@
     <EditText
         android:id="@+id/task_name"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/buttons_layout" />
+        android:layout_height="wrap_content" />
 
     <TextView
         android:id="@+id/start_date"
@@ -34,7 +33,7 @@
         android:id="@+id/buttons_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_centerVertical="true"
+        android:layout_below="@id/task_name"
         android:orientation="horizontal">
 
         <ImageView
@@ -49,5 +48,30 @@
             android:layout_height="wrap_content"
             android:src="@android:drawable/ic_input_add" />
     </LinearLayout>
+
+    <ImageView
+        android:id="@+id/take_picture_preview"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/done_button"
+        android:layout_marginBottom="16dp"
+        android:layout_marginLeft="8dp"
+        android:layout_marginRight="8dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/take_picture_preview"
+        android:layout_marginBottom="16dp"
+        android:layout_marginLeft="8dp"
+        android:layout_marginRight="8dp">
+
+        <TextView
+            android:id="@+id/scan_data_preview"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+    </ScrollView>
+
 
 </RelativeLayout>

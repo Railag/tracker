@@ -2,18 +2,29 @@ package com.firrael.tracker;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
+import android.support.v4.content.FileProvider;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
 import com.firrael.tracker.base.SimpleFragment;
+import com.firrael.tracker.openCV.OpenCVActivity;
 import com.firrael.tracker.realm.RealmDB;
 import com.firrael.tracker.realm.TaskModel;
 
+import java.io.File;
+import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 import io.realm.Realm;
@@ -28,7 +39,8 @@ public class AttachFragment extends SimpleFragment {
 
     private final static String TAG = AttachFragment.class.getSimpleName();
 
-    private static final int REQUEST_IMAGE_CAPTURE = 1;
+    public static final int REQUEST_IMAGE_CAPTURE = 1;
+    public static final int REQUEST_DOCUMENT_SCAN = 2;
 
     private final static String KEY_TASK_NAME = "keyTaskName";
 
@@ -46,8 +58,17 @@ public class AttachFragment extends SimpleFragment {
     private ImageView mScanDocumentIcon;
 
     private ImageView mTakePicturePreview;
+    private TextView mScanDataPreview;
 
-    private String taskName;
+
+    private String mTaskName;
+
+    private boolean mHasPicture;
+    private boolean mHasScan;
+
+    private String mCurrentPhotoPath;
+
+    private List<String> mCurrentScanData;
 
     @Override
     protected String getTitle() {
@@ -65,6 +86,7 @@ public class AttachFragment extends SimpleFragment {
         mScanDocumentIcon = v.findViewById(R.id.scan_document_icon);
 
         mTakePicturePreview = v.findViewById(R.id.take_picture_preview);
+        mScanDataPreview = v.findViewById(R.id.scan_data_preview);
 
         mTakePictureIcon.setOnClickListener(v1 -> takePicture());
         mScanDocumentIcon.setOnClickListener(v1 -> scanDocument());
@@ -73,21 +95,46 @@ public class AttachFragment extends SimpleFragment {
 
         Bundle args = getArguments();
         if (args != null) {
-            taskName = args.getString(KEY_TASK_NAME, "");
+            mTaskName = args.getString(KEY_TASK_NAME, "");
         }
     }
 
     private void takePicture() {
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         if (takePictureIntent.resolveActivity(getActivity().getPackageManager()) != null) {
-            startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                Toast.makeText(getActivity(), R.string.error_photo, Toast.LENGTH_SHORT).show();
+            }
+            if (photoFile != null) {
+                Uri photoURI = FileProvider.getUriForFile(getActivity(),
+                        "com.example.android.fileprovider",
+                        photoFile);
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
+                startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+            }
         }
     }
 
-    private void scanDocument() {
-        // TODO add handling
+    private File createImageFile() throws IOException {
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        String imageFileName = "JPEG_" + timeStamp + "_";
+        File storageDir = getActivity().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File image = File.createTempFile(
+                imageFileName,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
 
-        getMainActivity().toOpenCV();
+        mCurrentPhotoPath = image.getAbsolutePath();
+        return image;
+    }
+
+    private void scanDocument() {
+        Intent intent = new Intent(getMainActivity(), OpenCVActivity.class);
+        startActivityForResult(intent, REQUEST_DOCUMENT_SCAN);
     }
 
     private void done() {
@@ -105,16 +152,16 @@ public class AttachFragment extends SimpleFragment {
                 nextId = currentIdNum.intValue() + 1;
             }
 
-            TaskModel taskModel = new TaskModel(nextId, taskName, currentDate, TaskModel.STATUS_IN_PROGRESS);
+            TaskModel taskModel = new TaskModel(nextId, mTaskName, currentDate, TaskModel.STATUS_IN_PROGRESS);
 
-            boolean hasPicture = false;
-            if (hasPicture) {
-                // TODO add picture to model
+            if (mHasPicture) {
+                if (!TextUtils.isEmpty(mCurrentPhotoPath)) {
+                    taskModel.setImageUrl(mCurrentPhotoPath);
+                }
             }
 
-            boolean hasScan = false;
-            if (hasScan) {
-                // TODO add scan to model
+            if (mHasScan) {
+                taskModel.setOpenCVScanData(mCurrentScanData);
             }
 
             realm1.copyToRealmOrUpdate(taskModel);
@@ -132,8 +179,36 @@ public class AttachFragment extends SimpleFragment {
                     Bitmap imageBitmap = (Bitmap) extras.get("data");
                     mTakePicturePreview.setImageBitmap(imageBitmap);
                 }
+            } else {
+                loadImage(mCurrentPhotoPath);
+                mHasPicture = true;
+            }
+        } else if (requestCode == REQUEST_DOCUMENT_SCAN && resultCode == RESULT_OK) {
+            if (data != null) {
+                Bundle extras = data.getExtras();
+                if (extras != null) {
+                    mCurrentScanData = extras.getStringArrayList(OpenCVActivity.KEY_SCAN_RESULTS);
+                    if (mCurrentScanData != null && mCurrentScanData.size() > 0) {
+                        loadScan(mCurrentScanData);
+                        mHasScan = true;
+                    }
+                }
             }
         }
     }
 
+    private void loadImage(String url) {
+        Uri uri = Uri.fromFile(new File(url));
+        Glide.with(this).load(uri).into(mTakePicturePreview);
+    }
+
+    private void loadScan(List<String> openCVData) {
+        StringBuilder builder = new StringBuilder();
+        for (String line : openCVData) {
+            builder.append(line);
+            builder.append("\n");
+        }
+
+        mScanDataPreview.setText(builder.toString());
+    }
 }

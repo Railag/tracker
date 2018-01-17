@@ -1,5 +1,6 @@
 package com.firrael.tracker.openCV;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.hardware.Camera;
 import android.os.Build;
@@ -13,6 +14,7 @@ import android.view.WindowManager;
 import android.widget.Toast;
 
 import com.firrael.tracker.App;
+import com.firrael.tracker.AttachFragment;
 import com.firrael.tracker.R;
 import com.firrael.tracker.tesseract.Tesseract;
 import com.google.android.gms.drive.DriveContents;
@@ -44,8 +46,11 @@ import org.opencv.features2d.MSER;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.OutputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import rx.Observable;
 import rx.android.schedulers.AndroidSchedulers;
@@ -60,6 +65,8 @@ import static org.opencv.android.Utils.matToBitmap;
 public class OpenCVActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
 
     private final static String TAG = OpenCVActivity.class.getSimpleName();
+
+    public final static String KEY_SCAN_RESULTS = "scanResults";
 
     private final static Scalar CONTOUR_COLOR = Scalar.all(100);
 
@@ -107,6 +114,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         mTesseract = new Tesseract(this);
         mDetector = MSER.create();
+        mDetector.setMinArea(120);
+        mDetector.setMaxArea(14400);
+
+
         mDriveResourceClient = App.getDrive();
 
         mOpenCVCameraView = findViewById(R.id.javaCameraView);
@@ -181,6 +192,11 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private void onSuccess(List<String> s) {
         Log.i(TAG, "Results: " + s);
+        Intent data = new Intent();
+        ArrayList<String> results = new ArrayList<>(s);
+        data.putStringArrayListExtra(KEY_SCAN_RESULTS, results);
+        setResult(RESULT_OK, data);
+        finish();
     }
 
     private List<Bitmap> detectRegions() {
@@ -270,7 +286,9 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     public void uploadBitmapsToGoogleDrive(List<Bitmap> regions) {
-        final String folderName = "openCV";
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        final String folderName = timeStamp + " openCV";
+
         Task<DriveFolder> folderTask = createGoogleDriveFolder(folderName);
         Tasks.whenAll(folderTask).continueWith((Continuation<Void, Void>) task -> {
             DriveFolder parentFolder = folderTask.getResult();

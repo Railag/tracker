@@ -39,45 +39,59 @@ public class FocusCameraView extends JavaCameraView {
             case 1:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
-                else
+                else {
                     Toast.makeText(item, "Continuous Mode is not supported", Toast.LENGTH_SHORT).show();
+                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                        params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+                }
                 break;
             case 2:
-
-
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_EDOF))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_EDOF);
-                else
+                else {
                     Toast.makeText(item, "EDOF Mode is not supported", Toast.LENGTH_SHORT).show();
+                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                        params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+                }
                 break;
             case 3:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_FIXED))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_FIXED);
-                else
+                else {
                     Toast.makeText(item, "Fixed Mode is not supported", Toast.LENGTH_SHORT).show();
+                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                        params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+                }
                 break;
             case 4:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_INFINITY))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_INFINITY);
-                else
+                else {
                     Toast.makeText(item, "Infinity Mode is not supported", Toast.LENGTH_SHORT).show();
+                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                        params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+                }
                 break;
             case 5:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_MACRO))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
-                else
+                else {
                     Toast.makeText(item, "Macro Mode is not supported", Toast.LENGTH_SHORT).show();
+                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                        params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+                }
                 break;
             case 6:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
-                else
+                else {
                     Toast.makeText(item, "Continuous Picture Mode is not supported", Toast.LENGTH_SHORT).show();
+                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                        params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+                }
                 break;
         }
 
         mCamera.setParameters(params);
     }
-
 }
-

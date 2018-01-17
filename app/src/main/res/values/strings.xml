@@ -14,4 +14,5 @@
     <string name="attach_document">Attach Document</string>
     <string name="done">done</string>
     <string name="edit_task">Edit Task</string>
+    <string name="error_photo">An error occured while making photo.</string>
 </resources>
