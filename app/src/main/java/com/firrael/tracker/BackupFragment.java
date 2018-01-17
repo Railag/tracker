@@ -1,13 +1,11 @@
 package com.firrael.tracker;
 
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
 
@@ -228,45 +226,6 @@ public class BackupFragment extends SimpleFragment {
 
             return null;
         });
-    }
-
-    private void addGoogleDriveImage(Bitmap image, String name, String folderName) {
-        final Task<DriveContents> createContentsTask = mDriveResourceClient.createContents();
-        Query query = new Query.Builder()
-                .addFilter(Filters.eq(SearchableField.TITLE, folderName))
-                .build();
-        Task<MetadataBuffer> folders = mDriveResourceClient.query(query);
-        Tasks.whenAll(folders, createContentsTask).continueWithTask(task -> {
-            Metadata folderMetadata = null;
-            MetadataBuffer metadataBuffer = folders.getResult();
-            for (int i = 0; i < metadataBuffer.getCount(); i++) {
-                Metadata metadata = metadataBuffer.get(i);
-                if (metadata.getTitle().equalsIgnoreCase(folderName)) {
-                    folderMetadata = metadata;
-                    break;
-                }
-            }
-
-            DriveFolder folder = folderMetadata.getDriveId().asDriveFolder();
-
-            DriveContents contents = createContentsTask.getResult();
-            OutputStream outputStream = contents.getOutputStream();
-            image.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
-
-            MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                    .setTitle(name)
-                    .setMimeType("image/jpeg")
-                    .build();
-
-            // TODO    metadataBuffer.release();
-
-            return mDriveResourceClient.createFile(folder, changeSet, contents);
-        })
-                .addOnSuccessListener(getActivity(),
-                        driveFile -> Log.i(TAG, "Upload finished " + name))
-                .addOnFailureListener(getActivity(), e -> {
-                    Log.e(TAG, "Unable to create file", e);
-                });
     }
 
     private Task<DriveFolder> createGoogleDriveFolder(String name) {
