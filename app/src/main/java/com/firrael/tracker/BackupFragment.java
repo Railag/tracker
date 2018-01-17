@@ -6,8 +6,10 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.design.widget.Snackbar;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.SimpleTarget;
@@ -63,6 +65,10 @@ public class BackupFragment extends SimpleFragment {
 
     private DriveResourceClient mDriveResourceClient;
 
+    private int mNumberOfTasks;
+    private int mFinishedTasks;
+    private boolean loading;
+
     @Override
     protected String getTitle() {
         return getString(R.string.backup);
@@ -98,8 +104,12 @@ public class BackupFragment extends SimpleFragment {
     }
 
     private void upload() {
+        getMainActivity().startLoading();
+        loading = true;
+
         List<TaskModel> tasks = loadTasks();
 
+        mNumberOfTasks = tasks.size();
 
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
         final String folderName = timeStamp + " tasks";
@@ -117,6 +127,8 @@ public class BackupFragment extends SimpleFragment {
                 for (int i = 0; i < tasks.size(); i++) {
                     addTaskToGoogleDrive(tasks.get(i), rootDriveFolder);
                 }
+
+                buffer.release();
 
                 return null;
             });
@@ -156,71 +168,74 @@ public class BackupFragment extends SimpleFragment {
 
             Task<MetadataBuffer> metadataBufferTask = getMetadataForFolder(taskModel.getTaskName());
 
-            Tasks.whenAll(metadataBufferTask).continueWith((Continuation<Void, Void>) task2 -> {
-                Task<MetadataBuffer> metadataTask = getMetadataForFolder(taskModel.getTaskName());
+            Tasks.whenAll(metadataBufferTask).continueWith((Continuation<Void, Void>) task3 -> {
+                MetadataBuffer metadata = metadataBufferTask.getResult();
+                DriveFolder taskFolder = getDriveFolder(metadata, taskModel.getTaskName());
 
-                Tasks.whenAll(metadataTask).continueWith((Continuation<Void, Void>) task3 -> {
-                    MetadataBuffer metadata = metadataTask.getResult();
-                    DriveFolder taskFolder = getDriveFolder(metadata, taskModel.getTaskName());
+                if (taskModel.hasImage()) {
+                    DriveContents contents = createImageTask.getResult();
+                    OutputStream outputStream = contents.getOutputStream();
+                    Glide.with(this).load(taskModel.getImageUrl()).into(new SimpleTarget<Drawable>() {
+                        @Override
+                        public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                            if (resource instanceof BitmapDrawable) {
+                                BitmapDrawable bitmapDrawable = (BitmapDrawable) resource;
+                                Bitmap bitmap = bitmapDrawable.getBitmap();
+                                bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
 
-                    if (taskModel.hasImage()) {
-                        DriveContents contents = createImageTask.getResult();
-                        OutputStream outputStream = contents.getOutputStream();
-                        Glide.with(this).load(taskModel.getImageUrl()).into(new SimpleTarget<Drawable>() {
-                            @Override
-                            public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
-                                if (resource instanceof BitmapDrawable) {
-                                    BitmapDrawable bitmapDrawable = (BitmapDrawable) resource;
-                                    Bitmap bitmap = bitmapDrawable.getBitmap();
-                                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+                                MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
+                                        .setTitle(taskModel.getTaskName() + " image")
+                                        .setMimeType("image/jpeg")
+                                        .build();
 
-                                    MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                                            .setTitle(taskModel.getTaskName() + " image")
-                                            .setMimeType("image/jpeg")
-                                            .build();
-
-                                    // TODO    metadataBuffer.release();
-
-                                    mDriveResourceClient.createFile(taskFolder, changeSet, contents);
-                                }
+                                mDriveResourceClient.createFile(taskFolder, changeSet, contents);
                             }
-                        });
+                        }
+                    });
+                }
+
+                DriveContents jsonFile = createJsonTask.getResult();
+                OutputStream outputStream = jsonFile.getOutputStream();
+
+                Gson gson = new GsonBuilder()
+                        .setExclusionStrategies(new ExclusionStrategy() {
+                            @Override
+                            public boolean shouldSkipField(FieldAttributes f) {
+                                return f.getDeclaringClass().equals(RealmObject.class);
+                            }
+
+                            @Override
+                            public boolean shouldSkipClass(Class<?> clazz) {
+                                return false;
+                            }
+                        })
+                        .registerTypeAdapter(TaskModel.class, new TaskModelSerializer())
+                        .create();
+
+                String json = gson.toJson(RealmDB.get().copyFromRealm(taskModel));
+
+                outputStream.write(json.getBytes());
+
+                MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
+                        .setTitle(taskModel.getTaskName())
+                        .setMimeType("text/json")
+                        .build();
+
+                metadata.release();
+
+                Task lastTask = mDriveResourceClient.createFile(taskFolder, changeSet, jsonFile);
+                lastTask.addOnCompleteListener(task1 -> {
+                    if (loading) {
+                        mFinishedTasks++;
+                        if (mFinishedTasks >= mNumberOfTasks) {
+                            loading = false;
+                            mFinishedTasks = 0;
+                            mNumberOfTasks = 0;
+                            Snackbar.make(getView(), "Backup Successfully Uploaded.", Snackbar.LENGTH_SHORT).show();
+                            getMainActivity().stopLoading();
+                        }
                     }
-
-                    DriveContents jsonFile = createJsonTask.getResult();
-                    OutputStream outputStream = jsonFile.getOutputStream();
-
-                    Gson gson = new GsonBuilder()
-                            .setExclusionStrategies(new ExclusionStrategy() {
-                                @Override
-                                public boolean shouldSkipField(FieldAttributes f) {
-                                    return f.getDeclaringClass().equals(RealmObject.class);
-                                }
-
-                                @Override
-                                public boolean shouldSkipClass(Class<?> clazz) {
-                                    return false;
-                                }
-                            })
-                            .registerTypeAdapter(TaskModel.class, new TaskModelSerializer())
-                            .create();
-
-                    String json = gson.toJson(RealmDB.get().copyFromRealm(taskModel));
-
-                    outputStream.write(json.getBytes());
-
-                    MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                            .setTitle(taskModel.getTaskName())
-                            .setMimeType("text/json")
-                            .build();
-
-                    // TODO    metadataBuffer.release();
-
-                    mDriveResourceClient.createFile(taskFolder, changeSet, jsonFile);
-
-                    return null;
                 });
-
                 return null;
             });
 
