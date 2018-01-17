@@ -3,11 +3,7 @@ package com.firrael.tracker;
 import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.content.Intent;
-import android.content.res.Resources;
 import android.os.Bundle;
-import android.speech.RecognitionListener;
-import android.speech.RecognizerIntent;
-import android.speech.SpeechRecognizer;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
@@ -16,7 +12,6 @@ import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.AppCompatDrawableManager;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
@@ -27,7 +22,6 @@ import android.view.WindowManager;
 import android.widget.TextView;
 
 import com.firrael.tracker.openCV.OpenCVActivity;
-import com.firrael.tracker.realm.RealmDB;
 import com.firrael.tracker.realm.TaskModel;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -43,12 +37,6 @@ import com.google.android.gms.tasks.Task;
 import com.wang.avi.AVLoadingIndicatorView;
 
 import org.opencv.android.OpenCVLoader;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Locale;
-
-import io.realm.Realm;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
@@ -212,6 +200,10 @@ public class MainActivity extends AppCompatActivity
         setFragment(EditTaskFragment.newInstance(task));
     }
 
+    public void toBackup() {
+        setFragment(BackupFragment.newInstance());
+    }
+
     public void toLanding() {
         setFragment(LandingTaskFragment.newInstance());
     }
@@ -253,8 +245,8 @@ public class MainActivity extends AppCompatActivity
 
         } else if (id == R.id.nav_share) {
 
-        } else if (id == R.id.nav_send) {
-
+        } else if (id == R.id.nav_backup) {
+            toBackup();
         }
 
         DrawerLayout drawer = findViewById(R.id.drawer_layout);

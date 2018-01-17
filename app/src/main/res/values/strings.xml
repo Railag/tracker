@@ -15,4 +15,7 @@
     <string name="done">done</string>
     <string name="edit_task">Edit Task</string>
     <string name="error_photo">An error occured while making photo.</string>
+    <string name="backup">Backup</string>
+    <string name="upload_new_backup_to_google_drive">Upload new backup to Google Drive.</string>
+    <string name="import_your_backup_data_from_google_drive_into_your_app">Import your backup data from Google Drive into your app.</string>
 </resources>
