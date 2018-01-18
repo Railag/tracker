@@ -22,6 +22,7 @@ public class SplashFragment extends SimpleFragment {
         startLoading();
         getMainActivity().transparentStatusBar();
         getMainActivity().hideToolbar();
+        getMainActivity().hideFab();
 
         Utils.verifyCameraPermission(getActivity());
         Utils.verifyStoragePermissions(getActivity());

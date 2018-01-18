@@ -18,4 +18,5 @@
     <string name="backup">Backup</string>
     <string name="upload_new_backup_to_google_drive">Upload new backup to Google Drive.</string>
     <string name="import_your_backup_data_from_google_drive_into_your_app">Import your backup data from Google Drive into your app.</string>
+    <string name="backup_success_snackbar">Backup Successfully Uploaded.</string>
 </resources>

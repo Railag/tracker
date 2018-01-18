@@ -9,7 +9,6 @@ import android.support.annotation.Nullable;
 import android.support.design.widget.Snackbar;
 import android.view.View;
 import android.widget.ImageButton;
-import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.SimpleTarget;
@@ -18,15 +17,13 @@ import com.firrael.tracker.base.SimpleFragment;
 import com.firrael.tracker.realm.RealmDB;
 import com.firrael.tracker.realm.TaskModel;
 import com.google.android.gms.drive.DriveContents;
+import com.google.android.gms.drive.DriveFile;
 import com.google.android.gms.drive.DriveFolder;
 import com.google.android.gms.drive.DriveResourceClient;
-import com.google.android.gms.drive.Metadata;
 import com.google.android.gms.drive.MetadataBuffer;
 import com.google.android.gms.drive.MetadataChangeSet;
-import com.google.android.gms.drive.query.Filters;
-import com.google.android.gms.drive.query.Query;
-import com.google.android.gms.drive.query.SearchableField;
 import com.google.android.gms.tasks.Continuation;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.gson.ExclusionStrategy;
@@ -110,19 +107,24 @@ public class BackupFragment extends SimpleFragment {
         List<TaskModel> tasks = loadTasks();
 
         mNumberOfTasks = tasks.size();
+        for (TaskModel taskModel : tasks) {
+            if (taskModel.hasImage()) {
+                mNumberOfTasks++;
+            }
+        }
 
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
         final String folderName = timeStamp + " tasks";
 
-        Task<DriveFolder> folderTask = createGoogleDriveFolder(folderName);
+        Task<DriveFolder> folderTask = DriveUtils.createFolder(folderName, mDriveResourceClient);
         Tasks.whenAll(folderTask).continueWith((Continuation<Void, Void>) task -> {
             DriveFolder parentFolder = folderTask.getResult();
 
-            Task<MetadataBuffer> metadataTask = getMetadataForFolder(folderName);
+            Task<MetadataBuffer> metadataTask = DriveUtils.getMetadataForFolder(folderName, mDriveResourceClient);
             Tasks.whenAll(metadataTask).continueWithTask(task2 -> {
                 MetadataBuffer buffer = metadataTask.getResult();
 
-                DriveFolder rootDriveFolder = getDriveFolder(buffer, folderName);
+                DriveFolder rootDriveFolder = DriveUtils.getDriveFolder(buffer, folderName);
 
                 for (int i = 0; i < tasks.size(); i++) {
                     addTaskToGoogleDrive(tasks.get(i), rootDriveFolder);
@@ -137,58 +139,34 @@ public class BackupFragment extends SimpleFragment {
         });
     }
 
-    private Task<MetadataBuffer> getMetadataForFolder(String folderName) {
-        Query query = new Query.Builder()
-                .addFilter(Filters.eq(SearchableField.TITLE, folderName))
-                .build();
-        Task<MetadataBuffer> folders = mDriveResourceClient.query(query);
-        return folders;
-    }
-
-    private DriveFolder getDriveFolder(MetadataBuffer metadataBuffer, String folderName) {
-        Metadata folderMetadata = null;
-        for (int i = 0; i < metadataBuffer.getCount(); i++) {
-            Metadata metadata = metadataBuffer.get(i);
-            if (metadata.getTitle().equalsIgnoreCase(folderName)) {
-                folderMetadata = metadata;
-                break;
-            }
-        }
-
-        DriveFolder folder = folderMetadata.getDriveId().asDriveFolder();
-        return folder;
-    }
-
     private void addTaskToGoogleDrive(TaskModel taskModel, DriveFolder folder) {
         final Task<DriveContents> createJsonTask = mDriveResourceClient.createContents();
         final Task<DriveContents> createImageTask = mDriveResourceClient.createContents();
 
-        Task<DriveFolder> folderTask = createGoogleDriveFolder(taskModel.getTaskName(), folder);
+        Task<DriveFolder> folderTask = DriveUtils.createSubFolder(taskModel.getTaskName(), folder, mDriveResourceClient);
+
         Tasks.whenAll(folderTask, createJsonTask, createImageTask).continueWith((Continuation<Void, Void>) task -> {
 
-            Task<MetadataBuffer> metadataBufferTask = getMetadataForFolder(taskModel.getTaskName());
+            Task<MetadataBuffer> metadataBufferTask = DriveUtils.getMetadataForFolder(taskModel.getTaskName(), mDriveResourceClient);
 
-            Tasks.whenAll(metadataBufferTask).continueWith((Continuation<Void, Void>) task3 -> {
+            metadataBufferTask.continueWith(task3 -> {
                 MetadataBuffer metadata = metadataBufferTask.getResult();
-                DriveFolder taskFolder = getDriveFolder(metadata, taskModel.getTaskName());
+                DriveFolder taskFolder = DriveUtils.getDriveFolder(metadata, taskModel.getTaskName());
 
                 if (taskModel.hasImage()) {
                     DriveContents contents = createImageTask.getResult();
-                    OutputStream outputStream = contents.getOutputStream();
                     Glide.with(this).load(taskModel.getImageUrl()).into(new SimpleTarget<Drawable>() {
                         @Override
                         public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
                             if (resource instanceof BitmapDrawable) {
                                 BitmapDrawable bitmapDrawable = (BitmapDrawable) resource;
                                 Bitmap bitmap = bitmapDrawable.getBitmap();
-                                bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+                                String name = taskModel.getTaskName() + " image";
 
-                                MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                                        .setTitle(taskModel.getTaskName() + " image")
-                                        .setMimeType("image/jpeg")
-                                        .build();
-
-                                mDriveResourceClient.createFile(taskFolder, changeSet, contents);
+                                Task<DriveFile> imageTask = DriveUtils.createImage(contents, bitmap, name, taskFolder, mDriveResourceClient);
+                                imageTask.addOnCompleteListener(task12 -> {
+                                    verifyProgress();
+                                });
                             }
                         }
                     });
@@ -223,18 +201,9 @@ public class BackupFragment extends SimpleFragment {
 
                 metadata.release();
 
-                Task lastTask = mDriveResourceClient.createFile(taskFolder, changeSet, jsonFile);
+                Task<DriveFile> lastTask = mDriveResourceClient.createFile(taskFolder, changeSet, jsonFile);
                 lastTask.addOnCompleteListener(task1 -> {
-                    if (loading) {
-                        mFinishedTasks++;
-                        if (mFinishedTasks >= mNumberOfTasks) {
-                            loading = false;
-                            mFinishedTasks = 0;
-                            mNumberOfTasks = 0;
-                            Snackbar.make(getView(), "Backup Successfully Uploaded.", Snackbar.LENGTH_SHORT).show();
-                            getMainActivity().stopLoading();
-                        }
-                    }
+                    verifyProgress();
                 });
                 return null;
             });
@@ -243,28 +212,17 @@ public class BackupFragment extends SimpleFragment {
         });
     }
 
-    private Task<DriveFolder> createGoogleDriveFolder(String name) {
-        final Task<DriveFolder> rootFolderTask = mDriveResourceClient.getRootFolder();
-        rootFolderTask.continueWithTask(task -> {
-            DriveFolder parentFolder = task.getResult();
-            MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                    .setTitle(name)
-                    .setMimeType(DriveFolder.MIME_TYPE)
-                    .setStarred(true)
-                    .build();
-            return mDriveResourceClient.createFolder(parentFolder, changeSet);
-        });
-        return rootFolderTask;
-    }
-
-
-    private Task<DriveFolder> createGoogleDriveFolder(String name, DriveFolder driveFolder) {
-        MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                .setTitle(name)
-                .setMimeType(DriveFolder.MIME_TYPE)
-                .setStarred(true)
-                .build();
-        return mDriveResourceClient.createFolder(driveFolder, changeSet);
+    private void verifyProgress() {
+        if (loading) {
+            mFinishedTasks++;
+            if (mFinishedTasks >= mNumberOfTasks) {
+                loading = false;
+                mFinishedTasks = 0;
+                mNumberOfTasks = 0;
+                Snackbar.make(getView(), R.string.backup_success_snackbar, Snackbar.LENGTH_SHORT).show();
+                getMainActivity().stopLoading();
+            }
+        }
     }
 
     private List<TaskModel> loadTasks() {

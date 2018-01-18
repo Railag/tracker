@@ -58,7 +58,7 @@ public class MainActivity extends AppCompatActivity
 
     private FloatingActionButton mFab;
 
-    private Fragment currentFragment;
+    private Fragment mCurrentFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -148,7 +148,7 @@ public class MainActivity extends AppCompatActivity
 
     private <T extends Fragment> void setFragment(final T fragment) {
         runOnUiThread(() -> {
-            currentFragment = fragment;
+            mCurrentFragment = fragment;
 
             final FragmentTransaction fragmentTransaction = getFragmentManager().beginTransaction();
 
@@ -161,7 +161,7 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void setCurrentFragment(Fragment fragment) {
-        this.currentFragment = fragment;
+        this.mCurrentFragment = fragment;
     }
 
     public void showToolbar() {
@@ -208,14 +208,6 @@ public class MainActivity extends AppCompatActivity
         setFragment(LandingTaskFragment.newInstance());
     }
 
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.main, menu);
-        return true;
-    }
-
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle action bar item clicks here. The action bar will
@@ -241,7 +233,7 @@ public class MainActivity extends AppCompatActivity
             toOpenCV();
         } else if (id == R.id.nav_add_task) {
             toNewTask();
-        }  else if (id == R.id.nav_manage) {
+        } else if (id == R.id.nav_manage) {
 
         } else if (id == R.id.nav_share) {
 
@@ -335,6 +327,7 @@ public class MainActivity extends AppCompatActivity
     public final static int FAB_NEW = 0;
     public final static int FAB_NEXT = 1;
     public final static int FAB_DONE = 2;
+
     public void setupFab(View.OnClickListener listener, int fabState) {
         if (mFab != null) {
             showFab();

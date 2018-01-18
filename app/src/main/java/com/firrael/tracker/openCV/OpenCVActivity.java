@@ -2,10 +2,8 @@ package com.firrael.tracker.openCV;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.hardware.Camera;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -14,14 +12,12 @@ import android.view.WindowManager;
 import android.widget.Toast;
 
 import com.firrael.tracker.App;
-import com.firrael.tracker.AttachFragment;
+import com.firrael.tracker.DriveUtils;
 import com.firrael.tracker.R;
 import com.firrael.tracker.tesseract.Tesseract;
 import com.google.android.gms.drive.DriveContents;
-import com.google.android.gms.drive.DriveFile;
 import com.google.android.gms.drive.DriveFolder;
 import com.google.android.gms.drive.DriveResourceClient;
-import com.google.android.gms.drive.Metadata;
 import com.google.android.gms.drive.MetadataBuffer;
 import com.google.android.gms.drive.MetadataChangeSet;
 import com.google.android.gms.drive.query.Filters;
@@ -116,12 +112,12 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         mTesseract = new Tesseract(this);
         mDetector = MSER.create();
-    // TODO use all features    mDetector = MSER.create(5, 60, 14400, 0.25,
-    //            0.2, 200, 1.01, 0.003, 5);
-    //    mDetector.setMinArea(60);
-    //    mDetector.setMaxArea(14400);
-    //    mDetector.setDelta(5);
-    // TODO ???    mDetector.setPass2Only();
+        // TODO use all features    mDetector = MSER.create(5, 60, 14400, 0.25,
+        //            0.2, 200, 1.01, 0.003, 5);
+        //    mDetector.setMinArea(60);
+        //    mDetector.setMaxArea(14400);
+        //    mDetector.setDelta(5);
+        // TODO ???    mDetector.setPass2Only();
 
         mDriveResourceClient = App.getDrive();
 
@@ -294,8 +290,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
         final String folderName = timeStamp + " openCV";
 
-        Task<DriveFolder> folderTask = createGoogleDriveFolder(folderName);
-        Tasks.whenAll(folderTask).continueWith((Continuation<Void, Void>) task -> {
+        Task<DriveFolder> folderTask = DriveUtils.createFolder(folderName, mDriveResourceClient);
+        folderTask.continueWith(task -> {
             DriveFolder parentFolder = folderTask.getResult();
 
             for (int i = 0; i < regions.size(); i++) {
@@ -308,58 +304,22 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private void addGoogleDriveImage(Bitmap image, String name, String folderName) {
         final Task<DriveContents> createContentsTask = mDriveResourceClient.createContents();
-        Query query = new Query.Builder()
-                .addFilter(Filters.eq(SearchableField.TITLE, folderName))
-                .build();
-        Task<MetadataBuffer> folders = mDriveResourceClient.query(query);
-        Tasks.whenAll(folders, createContentsTask).continueWithTask(task -> {
-            Metadata folderMetadata = null;
-            MetadataBuffer metadataBuffer = folders.getResult();
-            for (int i = 0; i < metadataBuffer.getCount(); i++) {
-                Metadata metadata = metadataBuffer.get(i);
-                if (metadata.getTitle().equalsIgnoreCase(folderName)) {
-                    folderMetadata = metadata;
-                    break;
-                }
-            }
+        Task<MetadataBuffer> folders = DriveUtils.getMetadataForFolder(folderName, mDriveResourceClient);
 
-            DriveFolder folder = folderMetadata.getDriveId().asDriveFolder();
+        Tasks.whenAll(folders, createContentsTask).continueWithTask(task -> {
+            MetadataBuffer metadata = folders.getResult();
+            DriveFolder folder = DriveUtils.getDriveFolder(metadata, folderName);
 
             DriveContents contents = createContentsTask.getResult();
-            OutputStream outputStream = contents.getOutputStream();
-            image.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
 
-            MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                    .setTitle(name)
-                    .setMimeType("image/jpeg")
-                    .build();
+            metadata.release();
 
-            // TODO    metadataBuffer.release();
-
-            return mDriveResourceClient.createFile(folder, changeSet, contents);
+            return DriveUtils.createImage(contents, image, name, folder, mDriveResourceClient);
         })
                 .addOnSuccessListener(this,
                         driveFile -> Log.i(TAG, "Upload finished " + name))
                 .addOnFailureListener(this, e -> {
                     Log.e(TAG, "Unable to create file", e);
                 });
-    }
-
-
-    private Task<DriveFolder> createGoogleDriveFolder(String name) {
-        final Task<DriveFolder> rootFolderTask = mDriveResourceClient.getRootFolder();
-        rootFolderTask.continueWithTask(new Continuation<DriveFolder, Task<DriveFolder>>() {
-            @Override
-            public Task<DriveFolder> then(@NonNull Task<DriveFolder> task) throws Exception {
-                DriveFolder parentFolder = task.getResult();
-                MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
-                        .setTitle(name)
-                        .setMimeType(DriveFolder.MIME_TYPE)
-                        .setStarred(true)
-                        .build();
-                return mDriveResourceClient.createFolder(parentFolder, changeSet);
-            }
-        });
-        return rootFolderTask;
     }
 }
