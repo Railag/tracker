@@ -5,6 +5,7 @@
     <string name="navigation_drawer_close">Close navigation drawer</string>
 
     <string name="action_settings">Settings</string>
+    <string name="view_tasks">View Tasks</string>
     <string name="add_new_task">Add New Task</string>
     <string name="opencv_scanning">OpenCV Scanning</string>
     <string name="settings">Settings</string>
@@ -19,4 +20,8 @@
     <string name="upload_new_backup_to_google_drive">Upload new backup to Google Drive.</string>
     <string name="import_your_backup_data_from_google_drive_into_your_app">Import your backup data from Google Drive into your app.</string>
     <string name="backup_success_snackbar">Backup Successfully Uploaded.</string>
+    <string name="import_success_snackbar">Backup Successfully Imported.</string>
+    <string name="remove">Remove</string>
+    <string name="remove_this_task">Remove this task?</string>
+    <string name="close">Close</string>
 </resources>

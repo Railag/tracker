@@ -1,14 +1,22 @@
 package com.firrael.tracker;
 
+import android.content.IntentSender;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.Snackbar;
+import android.support.v4.content.FileProvider;
+import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.SimpleTarget;
@@ -16,12 +24,18 @@ import com.bumptech.glide.request.transition.Transition;
 import com.firrael.tracker.base.SimpleFragment;
 import com.firrael.tracker.realm.RealmDB;
 import com.firrael.tracker.realm.TaskModel;
+import com.google.android.gms.drive.DriveClient;
 import com.google.android.gms.drive.DriveContents;
 import com.google.android.gms.drive.DriveFile;
 import com.google.android.gms.drive.DriveFolder;
+import com.google.android.gms.drive.DriveId;
 import com.google.android.gms.drive.DriveResourceClient;
+import com.google.android.gms.drive.Metadata;
 import com.google.android.gms.drive.MetadataBuffer;
 import com.google.android.gms.drive.MetadataChangeSet;
+import com.google.android.gms.drive.OpenFileActivityOptions;
+import com.google.android.gms.drive.query.Filters;
+import com.google.android.gms.drive.query.SearchableField;
 import com.google.android.gms.tasks.Continuation;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
@@ -31,14 +45,20 @@ import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 
 import io.realm.Realm;
 import io.realm.RealmObject;
+import io.realm.RealmQuery;
 import io.realm.RealmResults;
 
 /**
@@ -47,6 +67,12 @@ import io.realm.RealmResults;
 
 public class BackupFragment extends SimpleFragment {
     private final static String TAG = BackupFragment.class.getSimpleName();
+
+    private final static String BACKUP_ROOT_INDICATOR = " tasks";
+
+    public final static int REQUEST_FIND_FOLDER = 3;
+
+    private final static String KEY_DRIVE_ID = "response_drive_id";
 
     public static BackupFragment newInstance() {
 
@@ -61,10 +87,17 @@ public class BackupFragment extends SimpleFragment {
     private ImageButton importButton;
 
     private DriveResourceClient mDriveResourceClient;
+    private DriveClient mDriveClient;
 
     private int mNumberOfTasks;
     private int mFinishedTasks;
     private boolean loading;
+
+    private Map<String, Bitmap> mBitmapsMap;
+
+    interface SelectFolderListener {
+        void selectedFolder(Bundle extras);
+    }
 
     @Override
     protected String getTitle() {
@@ -86,6 +119,7 @@ public class BackupFragment extends SimpleFragment {
         getMainActivity().hideFab();
 
         mDriveResourceClient = App.getDrive();
+        mDriveClient = App.getDriveClient();
 
         uploadButton.setOnClickListener(view -> {
             upload();
@@ -96,12 +130,103 @@ public class BackupFragment extends SimpleFragment {
         });
     }
 
-    private void importTasks() {
-        // TODO
+    private void importTasks() { // look for Folders && Title.contains("tasks")
+        OpenFileActivityOptions options = new OpenFileActivityOptions.Builder()
+                .setSelectionFilter(Filters.and(Filters.eq(SearchableField.MIME_TYPE, DriveFolder.MIME_TYPE),
+                        Filters.contains(SearchableField.TITLE, BACKUP_ROOT_INDICATOR)))
+                .build();
+        Task<IntentSender> intentSenderTask = mDriveClient.newOpenFileActivityIntentSender(options);
+        intentSenderTask.continueWith(task -> {
+            loading = true;
+            startLoading();
+            IntentSender intentSender = task.getResult();
+
+            try {
+                SelectFolderListener selectFolderListener = extras -> {
+                    if (extras == null || !extras.containsKey(KEY_DRIVE_ID)) {
+                        return;
+                    }
+
+                    mBitmapsMap = new HashMap<>();
+
+                    DriveId driveId = (DriveId) extras.get(KEY_DRIVE_ID);
+                    DriveFolder backupFolder = driveId.asDriveFolder();
+                    Task<MetadataBuffer> tasksMetadataTask = mDriveResourceClient.listChildren(backupFolder);
+                    tasksMetadataTask.continueWith(task1 -> {
+                        MetadataBuffer tasksMetadata = task1.getResult();
+
+                        List<DriveFolder> taskFolders = new ArrayList<>();
+                        for (int i = 0; i < tasksMetadata.getCount(); i++) {
+                            Metadata metadata = tasksMetadata.get(i);
+                            DriveFolder folder = metadata.getDriveId().asDriveFolder();
+                            taskFolders.add(folder);
+                        }
+
+                        for (DriveFolder folder : taskFolders) {
+                            Task<MetadataBuffer> localTaskMetadataTask = mDriveResourceClient.listChildren(folder);
+                            localTaskMetadataTask.continueWith(task2 -> {
+                                MetadataBuffer localTaskMetadata = task2.getResult();
+
+
+                                mNumberOfTasks += localTaskMetadata.getCount();
+                                mFinishedTasks = 0;
+
+                                for (int i = 0; i < localTaskMetadata.getCount(); i++) {
+                                    Metadata metadata = localTaskMetadata.get(i);
+                                    DriveFile file = metadata.getDriveId().asDriveFile();
+                                    String mimeType = metadata.getMimeType();
+                                    boolean isImage = mimeType.contains("image");
+
+                                    Task<DriveContents> fileTask = mDriveResourceClient.openFile(file, DriveFile.MODE_READ_ONLY);
+
+                                    fileTask.continueWith(task3 -> {
+                                        DriveContents fileContents = task3.getResult();
+
+                                        InputStream inputStream = fileContents.getInputStream();
+                                        InputStreamReader reader = new InputStreamReader(inputStream);
+
+                                        if (isImage) {
+                                            Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
+                                            mBitmapsMap.put(metadata.getTitle(), bitmap);
+                                        } else {
+                                            Gson gson = Utils.buildGson();
+                                            TaskModel taskModel = gson.fromJson(reader, TaskModel.class);
+                                            RealmDB.get().executeTransaction(realm -> realm.copyToRealmOrUpdate(taskModel));
+                                        }
+
+                                        tasksMetadata.release();
+                                        localTaskMetadata.release();
+
+                                        verifyProgress(false);
+
+                                        return mDriveResourceClient.discardContents(fileContents);
+                                    });
+                                }
+
+                                return null;
+                            });
+                        }
+
+
+                        return null;
+                    });
+
+                };
+
+                getMainActivity().setSelectFolderListener(selectFolderListener);
+                getMainActivity().startIntentSenderForResult(
+                        intentSender, REQUEST_FIND_FOLDER, null, 0, 0, 0);
+            } catch (IntentSender.SendIntentException e) {
+                Log.e(TAG, "Unable to create file", e);
+                Snackbar.make(getView(), "Unable to open Google Drive folders", Snackbar.LENGTH_SHORT).show();
+            }
+
+            return null;
+        });
     }
 
     private void upload() {
-        getMainActivity().startLoading();
+        startLoading();
         loading = true;
 
         List<TaskModel> tasks = loadTasks();
@@ -113,8 +238,8 @@ public class BackupFragment extends SimpleFragment {
             }
         }
 
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-        final String folderName = timeStamp + " tasks";
+        String timeStamp = Utils.getCurrentTimestamp();
+        final String folderName = timeStamp + BACKUP_ROOT_INDICATOR;
 
         Task<DriveFolder> folderTask = DriveUtils.createFolder(folderName, mDriveResourceClient);
         Tasks.whenAll(folderTask).continueWith((Continuation<Void, Void>) task -> {
@@ -165,7 +290,7 @@ public class BackupFragment extends SimpleFragment {
 
                                 Task<DriveFile> imageTask = DriveUtils.createImage(contents, bitmap, name, taskFolder, mDriveResourceClient);
                                 imageTask.addOnCompleteListener(task12 -> {
-                                    verifyProgress();
+                                    verifyProgress(true);
                                 });
                             }
                         }
@@ -175,20 +300,7 @@ public class BackupFragment extends SimpleFragment {
                 DriveContents jsonFile = createJsonTask.getResult();
                 OutputStream outputStream = jsonFile.getOutputStream();
 
-                Gson gson = new GsonBuilder()
-                        .setExclusionStrategies(new ExclusionStrategy() {
-                            @Override
-                            public boolean shouldSkipField(FieldAttributes f) {
-                                return f.getDeclaringClass().equals(RealmObject.class);
-                            }
-
-                            @Override
-                            public boolean shouldSkipClass(Class<?> clazz) {
-                                return false;
-                            }
-                        })
-                        .registerTypeAdapter(TaskModel.class, new TaskModelSerializer())
-                        .create();
+                Gson gson = Utils.buildGson();
 
                 String json = gson.toJson(RealmDB.get().copyFromRealm(taskModel));
 
@@ -203,7 +315,7 @@ public class BackupFragment extends SimpleFragment {
 
                 Task<DriveFile> lastTask = mDriveResourceClient.createFile(taskFolder, changeSet, jsonFile);
                 lastTask.addOnCompleteListener(task1 -> {
-                    verifyProgress();
+                    verifyProgress(true);
                 });
                 return null;
             });
@@ -212,17 +324,79 @@ public class BackupFragment extends SimpleFragment {
         });
     }
 
-    private void verifyProgress() {
+    private void verifyProgress(boolean uploading) {
         if (loading) {
             mFinishedTasks++;
             if (mFinishedTasks >= mNumberOfTasks) {
                 loading = false;
                 mFinishedTasks = 0;
                 mNumberOfTasks = 0;
-                Snackbar.make(getView(), R.string.backup_success_snackbar, Snackbar.LENGTH_SHORT).show();
+
+                if (!uploading) {
+                    handleBitmapsMap();
+                }
+
+                int stringResource = uploading ? R.string.backup_success_snackbar : R.string.import_success_snackbar;
+                Snackbar.make(getView(), stringResource, Snackbar.LENGTH_SHORT).show();
+
                 getMainActivity().stopLoading();
             }
         }
+    }
+
+    private void handleBitmapsMap() {
+        for (Map.Entry<String, Bitmap> entry : mBitmapsMap.entrySet()) {
+            String title = entry.getKey().replace(" image", ""); // remove image mark -> receive task name;
+            Bitmap bitmap = entry.getValue();
+
+            RealmDB.get().executeTransaction(realm -> {
+                RealmQuery<TaskModel> query = realm.where(TaskModel.class).contains("taskName", title);
+                TaskModel task = query.findFirst();
+                if (task != null) {
+                    String url = task.getImageUrl();
+                    if (!TextUtils.isEmpty(url)) {
+                        FileOutputStream out = null;
+                        File photoFile;
+
+                        try {
+                            photoFile = createImageFile(title);
+                            String photoPath = photoFile.getAbsolutePath();
+
+                            out = new FileOutputStream(photoPath);
+                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+                            bitmap.recycle();
+
+                            task.setImageUrl(photoPath);
+                            realm.copyToRealmOrUpdate(task);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            try {
+                                if (out != null) {
+                                    out.close();
+                                }
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }
+
+            });
+        }
+
+        mBitmapsMap.clear();
+    }
+
+    private File createImageFile(String title) throws IOException {
+        File storageDir = getActivity().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File image = File.createTempFile(
+                title,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
+
+        return image;
     }
 
     private List<TaskModel> loadTasks() {

@@ -2,6 +2,7 @@ package com.firrael.tracker;
 
 import android.app.Application;
 
+import com.google.android.gms.drive.DriveClient;
 import com.google.android.gms.drive.DriveResourceClient;
 
 import java.lang.ref.WeakReference;
@@ -13,6 +14,7 @@ public class App extends Application {
 
     private static WeakReference<MainActivity> activityRef;
     private static WeakReference<DriveResourceClient> driveRef;
+    private static WeakReference<DriveClient> driveClientRef;
 
     public static void setMainActivity(MainActivity activity) {
         activityRef = new WeakReference<>(activity);
@@ -22,8 +24,16 @@ public class App extends Application {
         return activityRef != null ? activityRef.get() : null;
     }
 
+    public static void setDriveClient(DriveClient driveClient) {
+        App.driveClientRef = new WeakReference<>(driveClient);
+    }
+
+    public static DriveClient getDriveClient() {
+        return driveClientRef != null ? driveClientRef.get() : null;
+    }
+
     public static void setDrive(DriveResourceClient drive) {
-        driveRef = new WeakReference<>(drive);
+        App.driveRef = new WeakReference<>(drive);
     }
 
     public static DriveResourceClient getDrive() {
@@ -35,8 +45,6 @@ public class App extends Application {
         super.onCreate();
         Realm.init(this);
     }
-
-
 
 
 }

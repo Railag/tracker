@@ -1,5 +1,7 @@
 package com.firrael.tracker;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -27,6 +29,9 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+
+import io.realm.Realm;
+import io.realm.RealmResults;
 
 import static android.app.Activity.RESULT_OK;
 import static com.firrael.tracker.AttachFragment.REQUEST_DOCUMENT_SCAN;
@@ -61,6 +66,7 @@ public class EditTaskFragment extends SimpleFragment {
     private TextView mStartDateView;
     private TextView mEndDateView;
     private Button mDoneButton;
+    private Button mRemoveButton;
     private ImageView mTakePicturePreview;
     private TextView mScanDataPreview;
 
@@ -89,6 +95,7 @@ public class EditTaskFragment extends SimpleFragment {
         mStartDateView = v.findViewById(R.id.start_date);
         mEndDateView = v.findViewById(R.id.end_date);
         mDoneButton = v.findViewById(R.id.done_button);
+        mRemoveButton = v.findViewById(R.id.remove_button);
         mTakePicturePreview = v.findViewById(R.id.take_picture_preview);
         mScanDataPreview = v.findViewById(R.id.scan_data_preview);
 
@@ -130,6 +137,22 @@ public class EditTaskFragment extends SimpleFragment {
                 mDoneButton.setVisibility(View.GONE);
                 break;
         }
+
+        mRemoveButton.setOnClickListener(view -> {
+            new AlertDialog.Builder(getActivity())
+                    .setTitle(R.string.remove_this_task)
+                    .setPositiveButton(R.string.remove, (dialogInterface, i) -> {
+                        RealmDB.get().executeTransaction(realm -> {
+                            RealmResults<TaskModel> result = realm.where(TaskModel.class).equalTo("id", mTask.getId()).findAll();
+                            result.deleteAllFromRealm();
+                            getMainActivity().toLanding();
+                        });
+                    })
+                    .setNegativeButton(R.string.close, (dialogInterface, i) -> {
+                        dialogInterface.dismiss();
+                    })
+                    .show();
+        });
 
         if (mTask.hasImage()) {
             loadImage(mTask.getImageUrl());
@@ -184,7 +207,7 @@ public class EditTaskFragment extends SimpleFragment {
     }
 
     private File createImageFile() throws IOException {
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        String timeStamp = Utils.getCurrentTimestamp();
         String imageFileName = "JPEG_" + timeStamp + "_";
         File storageDir = getActivity().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         File image = File.createTempFile(

@@ -14,16 +14,12 @@ import android.widget.Toast;
 import com.firrael.tracker.App;
 import com.firrael.tracker.DriveUtils;
 import com.firrael.tracker.R;
+import com.firrael.tracker.Utils;
 import com.firrael.tracker.tesseract.Tesseract;
 import com.google.android.gms.drive.DriveContents;
 import com.google.android.gms.drive.DriveFolder;
 import com.google.android.gms.drive.DriveResourceClient;
 import com.google.android.gms.drive.MetadataBuffer;
-import com.google.android.gms.drive.MetadataChangeSet;
-import com.google.android.gms.drive.query.Filters;
-import com.google.android.gms.drive.query.Query;
-import com.google.android.gms.drive.query.SearchableField;
-import com.google.android.gms.tasks.Continuation;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 
@@ -41,7 +37,6 @@ import org.opencv.core.Scalar;
 import org.opencv.features2d.MSER;
 import org.opencv.imgproc.Imgproc;
 
-import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -287,7 +282,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     public void uploadBitmapsToGoogleDrive(List<Bitmap> regions) {
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        String timeStamp = Utils.getCurrentTimestamp();
         final String folderName = timeStamp + " openCV";
 
         Task<DriveFolder> folderTask = DriveUtils.createFolder(folderName, mDriveResourceClient);

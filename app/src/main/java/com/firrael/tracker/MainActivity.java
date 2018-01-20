@@ -14,7 +14,6 @@ import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.Window;
@@ -59,6 +58,7 @@ public class MainActivity extends AppCompatActivity
     private FloatingActionButton mFab;
 
     private Fragment mCurrentFragment;
+    private BackupFragment.SelectFolderListener selectFolderListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,7 +96,18 @@ public class MainActivity extends AppCompatActivity
         mGoogleSignInClient = buildGoogleSignInClient();
 
         try {
-            handleSignInResult(mGoogleSignInClient.silentSignIn());
+            Task<GoogleSignInAccount> task = mGoogleSignInClient.silentSignIn();
+            task.continueWith(task1 -> {
+                try {
+                    GoogleSignInAccount account = task.getResult(ApiException.class);
+                    handleSignInResult(account);
+                    Log.i(TAG, "Sign in success");
+                } catch (ApiException e) {
+                    Log.e(TAG, "signInResult:failed code=" + e.getStatusCode());
+                }
+
+                return null;
+            });
         } catch (Exception e) {
             e.printStackTrace();
             Intent signInIntent = mGoogleSignInClient.getSignInIntent();
@@ -231,6 +242,8 @@ public class MainActivity extends AppCompatActivity
 
         if (id == R.id.nav_opencv) {
             toOpenCV();
+        } else if (id == R.id.nav_view_tasks) {
+            toLanding();
         } else if (id == R.id.nav_add_task) {
             toNewTask();
         } else if (id == R.id.nav_manage) {
@@ -298,30 +311,35 @@ public class MainActivity extends AppCompatActivity
         switch (requestCode) {
             case REQUEST_GOOGLE_SIGN_IN:
                 Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
-                handleSignInResult(task);
+                task.continueWith(task1 -> {
+                    try {
+                        GoogleSignInAccount account = task.getResult(ApiException.class);
+                        handleSignInResult(account);
+                        Log.i(TAG, "Sign in success");
+                    } catch (ApiException e) {
+                        Log.e(TAG, "signInResult:failed code=" + e.getStatusCode());
+                    }
+
+                    return null;
+                });
+                break;
+            case BackupFragment.REQUEST_FIND_FOLDER:
+                if (selectFolderListener != null) {
+                    if (data != null) {
+                        Bundle extras = data.getExtras();
+                        selectFolderListener.selectedFolder(extras);
+                    }
+                }
                 break;
         }
     }
 
-    private void handleSignInResult(Task<GoogleSignInAccount> completedTask) {
-        try {
-            GoogleSignInAccount account = completedTask.getResult(ApiException.class);
+    private void handleSignInResult(GoogleSignInAccount account) {
+        mDriveClient = Drive.getDriveClient(getApplicationContext(), account);
+        mDriveResourceClient = Drive.getDriveResourceClient(getApplicationContext(), account);
 
-            // Signed in successfully, show authenticated UI.
-            Log.i(TAG, "Sign in success");
-            // Build a drive client.
-            mDriveClient = Drive.getDriveClient(getApplicationContext(), account);
-            // Build a drive resource client.
-            mDriveResourceClient =
-                    Drive.getDriveResourceClient(getApplicationContext(), account);
-
-            App.setDrive(mDriveResourceClient);
-
-        } catch (ApiException e) {
-            // The ApiException status code indicates the detailed failure reason.
-            // Please refer to the GoogleSignInStatusCodes class reference for more information.
-            Log.w(TAG, "signInResult:failed code=" + e.getStatusCode());
-        }
+        App.setDriveClient(mDriveClient);
+        App.setDrive(mDriveResourceClient);
     }
 
     public final static int FAB_NEW = 0;
@@ -360,5 +378,9 @@ public class MainActivity extends AppCompatActivity
         if (mFab != null) {
             mFab.setVisibility(View.GONE);
         }
+    }
+
+    public void setSelectFolderListener(BackupFragment.SelectFolderListener selectFolderListener) {
+        this.selectFolderListener = selectFolderListener;
     }
 }
