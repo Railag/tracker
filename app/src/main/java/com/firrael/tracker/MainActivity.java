@@ -97,17 +97,14 @@ public class MainActivity extends AppCompatActivity
 
         try {
             Task<GoogleSignInAccount> task = mGoogleSignInClient.silentSignIn();
-            task.continueWith(task1 -> {
-                try {
-                    GoogleSignInAccount account = task.getResult(ApiException.class);
-                    handleSignInResult(account);
-                    Log.i(TAG, "Sign in success");
-                } catch (ApiException e) {
-                    Log.e(TAG, "signInResult:failed code=" + e.getStatusCode());
-                }
-
-                return null;
-            });
+            if (task.isSuccessful()) {
+                GoogleSignInAccount account = task.getResult(ApiException.class);
+                handleSignInResult(account);
+                Log.i(TAG, "Sign in success");
+            } else {
+                Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+                startActivityForResult(signInIntent, REQUEST_GOOGLE_SIGN_IN);
+            }
         } catch (Exception e) {
             e.printStackTrace();
             Intent signInIntent = mGoogleSignInClient.getSignInIntent();
@@ -380,7 +377,8 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
-    public void setSelectFolderListener(BackupFragment.SelectFolderListener selectFolderListener) {
+    public void setSelectFolderListener(BackupFragment.SelectFolderListener
+                                                selectFolderListener) {
         this.selectFolderListener = selectFolderListener;
     }
 }

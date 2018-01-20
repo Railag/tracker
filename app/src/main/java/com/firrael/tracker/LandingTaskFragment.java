@@ -56,7 +56,7 @@ public class LandingTaskFragment extends SimpleFragment {
 
         mAdapter = new TaskAdapter();
 
-        TaskAdapter.EditListener listener = task -> getMainActivity().toEditTask(task);
+        TaskAdapter.EditListener listener = task -> getMainActivity().toEditTask(RealmDB.get().copyFromRealm(task));
         mAdapter.setTasks(tasks, listener);
 
         mList.setAdapter(mAdapter);

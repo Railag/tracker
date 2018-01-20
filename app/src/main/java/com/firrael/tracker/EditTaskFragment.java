@@ -145,8 +145,8 @@ public class EditTaskFragment extends SimpleFragment {
                         RealmDB.get().executeTransaction(realm -> {
                             RealmResults<TaskModel> result = realm.where(TaskModel.class).equalTo("id", mTask.getId()).findAll();
                             result.deleteAllFromRealm();
-                            getMainActivity().toLanding();
                         });
+                        getMainActivity().toLanding();
                     })
                     .setNegativeButton(R.string.close, (dialogInterface, i) -> {
                         dialogInterface.dismiss();
