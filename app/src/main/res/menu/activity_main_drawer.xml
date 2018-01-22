@@ -10,12 +10,8 @@
             android:title="@string/view_tasks" />
         <item
             android:id="@+id/nav_add_task"
-            android:icon="@drawable/ic_menu_gallery"
+            android:icon="@drawable/ic_add_black_48dp"
             android:title="@string/add_new_task" />
-        <item
-            android:id="@+id/nav_opencv"
-            android:icon="@drawable/ic_menu_camera"
-            android:title="@string/opencv_scanning" />
 
     </group>
 
@@ -23,7 +19,7 @@
         <menu>
             <item
                 android:id="@+id/nav_manage"
-                android:icon="@drawable/ic_menu_manage"
+                android:icon="@drawable/ic_settings_black_48dp"
                 android:title="@string/settings" />
             <item
                 android:id="@+id/nav_share"

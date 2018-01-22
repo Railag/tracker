@@ -11,7 +11,7 @@
     <string name="settings">Settings</string>
     <string name="other">Other</string>
     <string name="new_task_title">New Task</string>
-    <string name="enter_task_name">Enter taskName name</string>
+    <string name="enter_task_name">Enter Task Name</string>
     <string name="attach_document">Attach Document</string>
     <string name="done">done</string>
     <string name="edit_task">Edit Task</string>
@@ -24,4 +24,7 @@
     <string name="remove">Remove</string>
     <string name="remove_this_task">Remove this task?</string>
     <string name="close">Close</string>
+    <string name="landing_empty_hint">Press + button to add new task or select some action using left drawer menu.</string>
+    <string name="photo_hint">Take a photo of some document, connected with this task!</string>
+    <string name="scan_hint">Scan some document and attach your document to the task as recognized text!</string>
 </resources>

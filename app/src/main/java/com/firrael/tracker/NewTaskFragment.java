@@ -5,16 +5,15 @@ import android.os.Bundle;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
+import android.support.v4.content.ContextCompat;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.TextView;
 
 import com.firrael.tracker.base.SimpleFragment;
 
@@ -41,6 +40,8 @@ public class NewTaskFragment extends SimpleFragment {
 
     private EditText mTaskNameEdit;
     private ImageView mVoiceIcon;
+
+    private SpeechRecognizer mRecognizer;
 
     @Override
     protected String getTitle() {
@@ -89,25 +90,10 @@ public class NewTaskFragment extends SimpleFragment {
             return handled;
         });
 
-        mVoiceIcon.setOnClickListener(v1 -> newVoiceTask());
-    }
+        mVoiceIcon.setOnClickListener(v1 -> startVoice());
 
-    private void toggleFab(boolean isValid) {
-        if (isValid) {
-            getMainActivity().setupFab(view -> next(), MainActivity.FAB_NEXT);
-        } else {
-            getMainActivity().hideFab();
-        }
-    }
-
-    private void next() {
-        String taskName = mTaskNameEdit.getText().toString();
-        getMainActivity().toAttach(taskName);
-    }
-
-    private void newVoiceTask() {
-        SpeechRecognizer recognizer = SpeechRecognizer.createSpeechRecognizer(getActivity());
-        recognizer.setRecognitionListener(new RecognitionListener() {
+        mRecognizer = SpeechRecognizer.createSpeechRecognizer(getActivity());
+        mRecognizer.setRecognitionListener(new RecognitionListener() {
             @Override
             public void onReadyForSpeech(Bundle params) {
                 Log.i(TAG, "onReadyForSpeech");
@@ -131,6 +117,7 @@ public class NewTaskFragment extends SimpleFragment {
             @Override
             public void onEndOfSpeech() {
                 Log.i(TAG, "onEndOfSpeech");
+                stopVoice();
             }
 
             @Override
@@ -145,10 +132,14 @@ public class NewTaskFragment extends SimpleFragment {
                     default:
                         Log.i(TAG, "Error code " + error);
                 }
+
+                stopVoice();
             }
 
             @Override
             public void onResults(Bundle results) {
+                stopVoice();
+
                 ArrayList<String> result = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 float[] scores = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES);
 
@@ -170,13 +161,41 @@ public class NewTaskFragment extends SimpleFragment {
                 Log.i(TAG, "onEvent " + eventType + params);
             }
         });
+    }
+
+    private void stopVoice() {
+        if (mRecognizer != null) {
+            mRecognizer.stopListening();
+        }
+
+        mVoiceIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_keyboard_voice_black_76dp));
+        mVoiceIcon.setOnClickListener(v1 -> startVoice());
+    }
+
+    private void toggleFab(boolean isValid) {
+        if (isValid) {
+            getMainActivity().setupFab(view -> next(), MainActivity.FAB_NEXT);
+        } else {
+            getMainActivity().hideFab();
+        }
+    }
+
+    private void next() {
+        String taskName = mTaskNameEdit.getText().toString();
+        getMainActivity().toAttach(taskName);
+    }
+
+    private void startVoice() {
+        mVoiceIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_settings_voice_black_76dp));
+        mVoiceIcon.setOnClickListener(view -> stopVoice());
+
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
 
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         //intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru_RU");
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
         //    intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Hello, How can I help you?");
-        recognizer.startListening(intent);
+        mRecognizer.startListening(intent);
     }
 
     private void setResult(String task) {

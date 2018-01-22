@@ -3,6 +3,7 @@ package com.firrael.tracker;
 import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
@@ -13,13 +14,16 @@ import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.bumptech.glide.Glide;
 import com.firrael.tracker.openCV.OpenCVActivity;
 import com.firrael.tracker.realm.TaskModel;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
@@ -51,6 +55,10 @@ public class MainActivity extends AppCompatActivity
     private AVLoadingIndicatorView loading;
     private TextView toolbarTitle;
 
+    private ImageView profileImage;
+    private TextView profileName;
+    private TextView profileEmail;
+
     private GoogleSignInClient mGoogleSignInClient;
     private DriveClient mDriveClient;
     private DriveResourceClient mDriveResourceClient;
@@ -77,7 +85,6 @@ public class MainActivity extends AppCompatActivity
 
         toolbar.setNavigationOnClickListener(v -> onBackPressed());
 
-
         mFab = findViewById(R.id.fab);
 
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
@@ -88,6 +95,11 @@ public class MainActivity extends AppCompatActivity
 
         NavigationView navigationView = findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
+
+        View headerView = navigationView.getHeaderView(0);
+        profileImage = headerView.findViewById(R.id.profile_image);
+        profileName = headerView.findViewById(R.id.profile_name);
+        profileEmail = headerView.findViewById(R.id.profile_email);
 
         initOpenCV();
 
@@ -116,6 +128,7 @@ public class MainActivity extends AppCompatActivity
         GoogleSignInOptions signInOptions =
                 new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                         .requestScopes(Drive.SCOPE_FILE)
+                        .requestEmail()
                         .build();
         return GoogleSignIn.getClient(this, signInOptions);
     }
@@ -234,12 +247,9 @@ public class MainActivity extends AppCompatActivity
     @SuppressWarnings("StatementWithEmptyBody")
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-        // Handle navigation view item clicks here.
         int id = item.getItemId();
 
-        if (id == R.id.nav_opencv) {
-            toOpenCV();
-        } else if (id == R.id.nav_view_tasks) {
+        if (id == R.id.nav_view_tasks) {
             toLanding();
         } else if (id == R.id.nav_add_task) {
             toNewTask();
@@ -272,34 +282,6 @@ public class MainActivity extends AppCompatActivity
                 availability.getErrorDialog(this, result, REQUEST_GOOGLE_SERVICES_AVAILABILITY).show();
         }
     }
-
-    /* private boolean isFolderExists(String folderName) {
-
-         DriveId folderId = DriveId.decodeFromString(folderName);
-         DriveFolder folder = Drive.DriveApi.getFolder(mGoogleApiClient, folderId);
-         folder.getMetadata(mGoogleApiClient).setResultCallback(metadataRetrievedCallback);
-
-     }
-
-     final private ResultCallback<DriveResource.MetadataResult> metadataRetrievedCallback = new
-             ResultCallback<DriveResource.MetadataResult>() {
-                 @Override
-                 public void onResult(DriveResource.MetadataResult result) {
-                     if (!result.getStatus().isSuccess()) {
-                         Log.v(TAG, "Problem while trying to fetch metadata.");
-                         return;
-                     }
-
-                     Metadata metadata = result.getMetadata();
-                     if(metadata.isTrashed()){
-                         Log.v(TAG, "Folder is trashed");
-                     }else{
-                         Log.v(TAG, "Folder is not trashed");
-                     }
-
-                 }
-             };
- */
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -337,6 +319,29 @@ public class MainActivity extends AppCompatActivity
 
         App.setDriveClient(mDriveClient);
         App.setDrive(mDriveResourceClient);
+
+        updateProfileUI(account);
+    }
+
+    private void updateProfileUI(GoogleSignInAccount account) {
+        if (profileImage != null) {
+            Uri profileUri = account.getPhotoUrl();
+            if (profileUri != null) {
+                Glide.with(this).load(profileUri).into(profileImage);
+            }
+        }
+
+        if (profileName != null) {
+            String name = account.getDisplayName();
+            profileName.setText(name);
+        }
+
+        if (profileEmail != null) {
+            String email = account.getEmail();
+            if (!TextUtils.isEmpty(email)) {
+                profileEmail.setText(email);
+            }
+        }
     }
 
     public final static int FAB_NEW = 0;

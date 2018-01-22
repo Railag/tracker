@@ -4,10 +4,13 @@ import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
+import android.widget.TextView;
 
 import com.firrael.tracker.base.SimpleFragment;
 import com.firrael.tracker.realm.RealmDB;
 import com.firrael.tracker.realm.TaskModel;
+
+import org.w3c.dom.Text;
 
 import java.util.List;
 
@@ -30,6 +33,7 @@ public class LandingTaskFragment extends SimpleFragment {
     }
 
     private RecyclerView mList;
+    private TextView mEmptyMessage;
 
     private TaskAdapter mAdapter;
 
@@ -45,9 +49,8 @@ public class LandingTaskFragment extends SimpleFragment {
 
     @Override
     protected void initView(View v) {
-        mList = v.findViewById(R.id.taskList);
-
-        getMainActivity().showToolbar();
+        mList = v.findViewById(R.id.task_list);
+        mEmptyMessage = v.findViewById(R.id.empty_message);
 
         LinearLayoutManager linearLayoutManager = new LinearLayoutManager(getActivity(), LinearLayoutManager.VERTICAL, false);
         mList.setLayoutManager(linearLayoutManager);
@@ -56,10 +59,18 @@ public class LandingTaskFragment extends SimpleFragment {
 
         mAdapter = new TaskAdapter();
 
-        TaskAdapter.EditListener listener = task -> getMainActivity().toEditTask(RealmDB.get().copyFromRealm(task));
-        mAdapter.setTasks(tasks, listener);
+        if (tasks != null && tasks.size() > 0) {
+            TaskAdapter.EditListener listener = task -> getMainActivity().toEditTask(RealmDB.get().copyFromRealm(task));
+            mAdapter.setTasks(tasks, listener);
 
-        mList.setAdapter(mAdapter);
+            mList.setAdapter(mAdapter);
+
+            mList.setVisibility(View.VISIBLE);
+            mEmptyMessage.setVisibility(View.GONE);
+        } else {
+            mList.setVisibility(View.GONE);
+            mEmptyMessage.setVisibility(View.VISIBLE);
+        }
 
         getMainActivity().setupFab(v1 -> getMainActivity().toNewTask(), MainActivity.FAB_NEW);
     }
