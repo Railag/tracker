@@ -4,6 +4,7 @@ import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
@@ -202,11 +203,6 @@ public class MainActivity extends AppCompatActivity
 
     public void toSplash() {
         setFragment(SplashFragment.newInstance());
-    }
-
-    public void toOpenCV() {
-        Intent intent = new Intent(this, OpenCVActivity.class);
-        startActivity(intent);
     }
 
     public void toNewTask() {

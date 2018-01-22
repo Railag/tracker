@@ -114,8 +114,6 @@ public class BackupFragment extends SimpleFragment {
         uploadButton = v.findViewById(R.id.upload_button);
         importButton = v.findViewById(R.id.import_button);
 
-        getMainActivity().showToolbar();
-
         getMainActivity().hideFab();
 
         mDriveResourceClient = App.getDrive();

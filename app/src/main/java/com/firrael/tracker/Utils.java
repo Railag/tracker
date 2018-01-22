@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
+import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.view.inputmethod.InputMethodManager;
 
@@ -17,7 +18,9 @@ import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
@@ -29,6 +32,7 @@ import io.realm.RealmObject;
 
 public class Utils {
     public final static String DATE_FORMAT = "yyyy-MM-dd hh:mm:ss";
+    public final static String DATE_UI_FORMAT = "yyyy-mm-dd 'at' hh:mm";
 
 
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
@@ -130,5 +134,61 @@ public class Utils {
                 })
                 .registerTypeAdapter(TaskModel.class, new TaskModelSerializer())
                 .create();
+    }
+
+    public static String formatUIDate(String dateString) {
+        if (TextUtils.isEmpty(dateString)) {
+            return dateString;
+        }
+
+        Calendar calendar = Calendar.getInstance();
+        SimpleDateFormat format = new SimpleDateFormat(Utils.DATE_FORMAT, Locale.getDefault());
+        try {
+            Date date = format.parse(dateString);
+            Calendar dateCalendar = Calendar.getInstance();
+            dateCalendar.setTime(date);
+            int daysPassed = calendar.get(Calendar.DAY_OF_MONTH) - dateCalendar.get(Calendar.DAY_OF_MONTH);
+            String day;
+            switch (daysPassed) {
+                case 0:
+                    day = "Today";
+                    break;
+                case 1:
+                    day = "Yesterday";
+                    break;
+                case 2:
+                    day = "2 Days Ago";
+                    break;
+                case 3:
+                    day = "3 Days Ago";
+                    break;
+                default:
+                    return new SimpleDateFormat(Utils.DATE_UI_FORMAT, Locale.getDefault()).format(date);
+            }
+            return day + " at " + dateCalendar.get(Calendar.HOUR) + ":" + getMinutes(dateCalendar) + getAmOrPm(dateCalendar);
+        } catch (ParseException e) {
+            e.printStackTrace();
+            return dateString;
+        }
+    }
+
+    private static String getAmOrPm(Calendar dateCalendar) {
+        int amPm = dateCalendar.get(Calendar.AM_PM);
+        if (amPm == Calendar.AM) {
+            return " AM";
+        } else if (amPm == Calendar.PM) {
+            return " PM";
+        }
+
+        return "";
+    }
+
+    private static String getMinutes(Calendar dateCalendar) {
+        int minutes = dateCalendar.get(Calendar.MINUTE);
+        if (minutes < 10) {
+            return "0" + minutes;
+        } else {
+            return String.valueOf(minutes);
+        }
     }
 }

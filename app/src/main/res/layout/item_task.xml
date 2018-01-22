@@ -19,6 +19,8 @@
             android:id="@+id/taskName"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:textColor="@color/black"
+            android:textStyle="bold"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -28,7 +30,7 @@
             android:id="@+id/startDate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:textColor="@color/black"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/taskName"
             tools:text="Yesterday at 6:15 pm" />
@@ -37,16 +39,15 @@
             android:id="@+id/endDate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@+id/startDate"
-            app:layout_constraintTop_toBottomOf="@+id/taskName"
+            android:textColor="@color/black"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/startDate"
             tools:text="Yesterday at 6:45 pm" />
 
         <ImageView
             android:id="@+id/status"
             android:layout_width="wrap_content"
-            android:layout_height="20dp"
+            android:layout_height="28dp"
             android:layout_marginTop="8dp"
             android:src="@drawable/status_indicator"
             app:layout_constraintStart_toStartOf="parent"

@@ -3,6 +3,7 @@ package com.firrael.tracker;
 import android.content.Context;
 import android.content.res.Resources;
 import android.support.v7.widget.RecyclerView;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -50,9 +51,11 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.ViewHolder> {
         TaskModel task = tasks.get(position);
 
         holder.mTaskName.setText(task.getTaskName());
-        holder.mStartDate.setText(task.getStartDate());
-        holder.mEndDate.setText(task.getEndDate());
-        switch (task.getStatus()) {  // TODO add Glide for caching
+        holder.mStartDate.setText(String.format("Started %s", Utils.formatUIDate(task.getStartDate())));
+        if (!TextUtils.isEmpty(task.getEndDate())) {
+            holder.mEndDate.setText(String.format("Finished %s", Utils.formatUIDate(task.getEndDate())));
+        }
+        switch (task.getStatus()) {
             case TaskModel.STATUS_IN_PROGRESS:
                 holder.mStatus.setColorFilter(res.getColor(R.color.yellow));
                 break;

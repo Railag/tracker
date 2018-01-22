@@ -1,7 +1,6 @@
 package com.firrael.tracker;
 
 import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -25,7 +24,9 @@ import com.firrael.tracker.realm.TaskModel;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -119,8 +120,10 @@ public class EditTaskFragment extends SimpleFragment {
     }
 
     private void init() {
-        mStartDateView.setText(mTask.getStartDate());
-        mEndDateView.setText(mTask.getEndDate());
+        mStartDateView.setText(String.format("Started %s", Utils.formatUIDate(mTask.getStartDate())));
+        if (!TextUtils.isEmpty(mTask.getEndDate())) {
+            mEndDateView.setText(String.format("Finished %s", Utils.formatUIDate(mTask.getEndDate())));
+        }
 
         switch (mTask.getStatus()) {
             case TaskModel.STATUS_IN_PROGRESS:

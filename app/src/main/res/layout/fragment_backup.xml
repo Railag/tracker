@@ -9,8 +9,9 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="64dp"
         android:text="@string/upload_new_backup_to_google_drive"
-        android:textColor="@color/black" />
+        android:textColor="@color/white" />
 
     <ImageButton
         android:id="@+id/upload_button"
@@ -25,7 +26,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/import_your_backup_data_from_google_drive_into_your_app"
-        android:textColor="@color/black" />
+        android:textColor="@color/white" />
 
     <ImageButton
         android:id="@+id/import_button"
