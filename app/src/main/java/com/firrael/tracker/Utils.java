@@ -111,8 +111,16 @@ public class Utils {
         return diff / NANO;
     }
 
-    public static boolean canWrite(Activity activity) {
+    public static boolean checkDiskPermission(Activity activity) {
         return ActivityCompat.checkSelfPermission(activity, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    public static boolean checkCameraPermission(Activity activity) {
+        return ActivityCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    public static boolean checkVoicePermission(Activity activity) {
+        return ActivityCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
     }
 
     public static String getCurrentTimestamp() {

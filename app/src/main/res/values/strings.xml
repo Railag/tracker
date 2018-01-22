@@ -15,7 +15,7 @@
     <string name="attach_document">Attach Document</string>
     <string name="done">done</string>
     <string name="edit_task">Edit Task</string>
-    <string name="error_photo">An error occured while making photo.</string>
+    <string name="error_photo">An error occurred while making photo.</string>
     <string name="backup">Backup</string>
     <string name="upload_new_backup_to_google_drive">Upload new backup to Google Drive.</string>
     <string name="import_your_backup_data_from_google_drive_into_your_app">Import your backup data from Google Drive into your app.</string>
@@ -27,4 +27,7 @@
     <string name="landing_empty_hint">Press + button to add new task or select some action using left drawer menu.</string>
     <string name="photo_hint">Take a photo of some document, connected with this task!</string>
     <string name="scan_hint">Scan some document and attach your document to the task as recognized text!</string>
+    <string name="share">Share</string>
+    <string name="share_text">Try Tracker app via this url: https://google.com</string>
+    <string name="share_error">An Error Occurred, No Apps Available For Sharing</string>
 </resources>

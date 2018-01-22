@@ -186,6 +186,11 @@ public class NewTaskFragment extends SimpleFragment {
     }
 
     private void startVoice() {
+        if (!Utils.checkVoicePermission(getActivity())) {
+            Utils.verifySpeechPermission(getActivity());
+            return;
+        }
+
         mVoiceIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_settings_voice_black_76dp));
         mVoiceIcon.setOnClickListener(view -> stopVoice());
 

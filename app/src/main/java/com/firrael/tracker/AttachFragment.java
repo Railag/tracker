@@ -100,6 +100,16 @@ public class AttachFragment extends SimpleFragment {
     }
 
     private void takePicture() {
+        if (!Utils.checkCameraPermission(getActivity())) {
+            Utils.verifyCameraPermission(getActivity());
+            return;
+        }
+
+        if (!Utils.checkDiskPermission(getActivity())) {
+            Utils.verifyStoragePermissions(getActivity());
+            return;
+        }
+
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         if (takePictureIntent.resolveActivity(getActivity().getPackageManager()) != null) {
             File photoFile = null;
@@ -133,6 +143,16 @@ public class AttachFragment extends SimpleFragment {
     }
 
     private void scanDocument() {
+        if (!Utils.checkCameraPermission(getActivity())) {
+            Utils.verifyCameraPermission(getActivity());
+            return;
+        }
+
+        if (!Utils.checkDiskPermission(getActivity())) {
+            Utils.verifyStoragePermissions(getActivity());
+            return;
+        }
+
         Intent intent = new Intent(getMainActivity(), OpenCVActivity.class);
         startActivityForResult(intent, REQUEST_DOCUMENT_SCAN);
     }

@@ -3,12 +3,13 @@ package com.firrael.tracker;
 import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
+import android.support.design.widget.Snackbar;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
@@ -25,7 +26,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
-import com.firrael.tracker.openCV.OpenCVActivity;
 import com.firrael.tracker.realm.TaskModel;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -102,8 +102,6 @@ public class MainActivity extends AppCompatActivity
         profileName = headerView.findViewById(R.id.profile_name);
         profileEmail = headerView.findViewById(R.id.profile_email);
 
-        initOpenCV();
-
         toSplash();
 
         mGoogleSignInClient = buildGoogleSignInClient();
@@ -134,22 +132,17 @@ public class MainActivity extends AppCompatActivity
         return GoogleSignIn.getClient(this, signInOptions);
     }
 
-    private void initOpenCV() {
-        boolean initialized = OpenCVLoader.initDebug();
-        if (initialized) {
-            Log.i(TAG, "OpenCV initialized successfully.");
-        } else {
-            Log.i(TAG, "Error during OpenCV initialization.");
-        }
-    }
-
     @Override
     public void onBackPressed() {
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         if (drawer.isDrawerOpen(GravityCompat.START)) {
             drawer.closeDrawer(GravityCompat.START);
         } else {
-            super.onBackPressed();
+            if (mCurrentFragment instanceof LandingTaskFragment) {
+                finish();
+            } else {
+                super.onBackPressed();
+            }
         }
     }
 
@@ -174,11 +167,10 @@ public class MainActivity extends AppCompatActivity
 
             final FragmentTransaction fragmentTransaction = getFragmentManager().beginTransaction();
 
-            // TODO custom transaction animations
+            fragmentTransaction.setCustomAnimations(android.R.animator.fade_in, android.R.animator.fade_out);
             fragmentTransaction.addToBackStack(fragment.getClass().getSimpleName());
             fragmentTransaction.replace(R.id.mainFragment, fragment, TAG_MAIN);
             fragmentTransaction.commitAllowingStateLoss();
-
         });
     }
 
@@ -249,10 +241,10 @@ public class MainActivity extends AppCompatActivity
             toLanding();
         } else if (id == R.id.nav_add_task) {
             toNewTask();
-        } else if (id == R.id.nav_manage) {
-
+        } else if (id == R.id.nav_settings) {
+            // TODO
         } else if (id == R.id.nav_share) {
-
+            shareApp();
         } else if (id == R.id.nav_backup) {
             toBackup();
         }
@@ -260,6 +252,19 @@ public class MainActivity extends AppCompatActivity
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
+    }
+
+    private void shareApp() {
+        Intent intent = new Intent();
+        intent.setAction(Intent.ACTION_SEND);
+        intent.putExtra(Intent.EXTRA_TEXT, getString(R.string.share_text));
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, "text/plain");
+        PackageManager packageManager = getPackageManager();
+        if (intent.resolveActivity(packageManager) != null) {
+            startActivity(intent);
+        } else {
+            Snackbar.make(toolbar, R.string.share_error, Snackbar.LENGTH_SHORT).show();
+        }
     }
 
     @Override
@@ -303,6 +308,8 @@ public class MainActivity extends AppCompatActivity
                     if (data != null) {
                         Bundle extras = data.getExtras();
                         selectFolderListener.selectedFolder(extras);
+                    } else {
+                        stopLoading();
                     }
                 }
                 break;

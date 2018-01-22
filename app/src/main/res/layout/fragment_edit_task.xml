@@ -7,10 +7,10 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginRight="16dp"
         android:layout_marginTop="64dp"
-        android:paddingBottom="16dp"
-        android:paddingLeft="16dp"
-        android:paddingRight="16dp">
+        android:paddingBottom="16dp">
 
         <EditText
             android:id="@+id/task_name"
@@ -25,6 +25,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_below="@+id/buttons_layout"
+            android:layout_marginLeft="16dp"
+            android:layout_marginRight="16dp"
             android:layout_marginTop="16dp"
             android:textColor="@color/white"
             android:textSize="18sp" />
@@ -34,6 +36,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_below="@id/start_date"
+            android:layout_marginLeft="16dp"
+            android:layout_marginRight="16dp"
             android:textColor="@color/white"
             android:textSize="18sp" />
 
@@ -101,6 +105,12 @@
                 android:text="@string/scan_hint"
                 android:textColor="@color/white"
                 android:textSize="18sp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="8dp"
+                android:background="@color/separatorGrey" />
         </LinearLayout>
 
         <ImageView

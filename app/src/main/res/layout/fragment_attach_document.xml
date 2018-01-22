@@ -58,14 +58,16 @@
             android:layout_height="wrap_content"
             android:layout_below="@id/icons_layout"
             android:layout_marginBottom="16dp"
-            android:layout_marginLeft="8dp"
-            android:layout_marginRight="8dp" />
+            android:layout_marginLeft="16dp"
+            android:layout_marginRight="16dp" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:layout_below="@id/take_picture_preview"
-            android:background="@color/separatorGrey" />
+            android:background="@color/separatorGrey"
+            android:layout_marginLeft="16dp"
+            android:layout_marginRight="16dp"/>
 
         <TextView
             android:id="@+id/scan_data_preview"
@@ -73,8 +75,8 @@
             android:layout_height="wrap_content"
             android:layout_below="@id/take_picture_preview"
             android:layout_marginBottom="16dp"
-            android:layout_marginLeft="8dp"
-            android:layout_marginRight="8dp" />
+            android:layout_marginLeft="16dp"
+            android:layout_marginRight="16dp" />
 
     </RelativeLayout>
 
