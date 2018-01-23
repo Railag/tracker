@@ -65,9 +65,9 @@
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:layout_below="@id/take_picture_preview"
-            android:background="@color/separatorGrey"
             android:layout_marginLeft="16dp"
-            android:layout_marginRight="16dp"/>
+            android:layout_marginRight="16dp"
+            android:background="@color/separatorGrey" />
 
         <TextView
             android:id="@+id/scan_data_preview"
@@ -76,7 +76,8 @@
             android:layout_below="@id/take_picture_preview"
             android:layout_marginBottom="16dp"
             android:layout_marginLeft="16dp"
-            android:layout_marginRight="16dp" />
+            android:layout_marginRight="16dp"
+            android:textColor="@color/white" />
 
     </RelativeLayout>
 

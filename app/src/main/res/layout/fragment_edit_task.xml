@@ -129,7 +129,8 @@
             android:layout_below="@id/take_picture_preview"
             android:layout_marginBottom="16dp"
             android:layout_marginLeft="8dp"
-            android:layout_marginRight="8dp" />
+            android:layout_marginRight="8dp"
+            android:textColor="@color/white" />
 
     </RelativeLayout>
 
