@@ -181,6 +181,7 @@ public class NewTaskFragment extends SimpleFragment {
     }
 
     private void next() {
+        Utils.hideKeyboard(getActivity());
         String taskName = mTaskNameEdit.getText().toString();
         getMainActivity().toAttach(taskName);
     }

@@ -12,6 +12,7 @@
         android:layout_centerVertical="true"
         android:hint="@string/enter_task_name"
         android:imeOptions="actionNext"
+        android:inputType="textAutoComplete"
         android:textColor="@color/white"
         android:textColorHint="@color/lightGrey" />
 
