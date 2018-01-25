@@ -120,7 +120,8 @@
             android:layout_below="@id/done_button"
             android:layout_marginBottom="16dp"
             android:layout_marginLeft="8dp"
-            android:layout_marginRight="8dp" />
+            android:layout_marginRight="8dp"
+            android:layout_marginTop="8dp" />
 
         <TextView
             android:id="@+id/scan_data_preview"
@@ -130,6 +131,7 @@
             android:layout_marginBottom="16dp"
             android:layout_marginLeft="8dp"
             android:layout_marginRight="8dp"
+            android:layout_marginTop="8dp"
             android:textColor="@color/white" />
 
     </RelativeLayout>

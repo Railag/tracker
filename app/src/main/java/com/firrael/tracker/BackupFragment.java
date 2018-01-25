@@ -153,6 +153,13 @@ public class BackupFragment extends SimpleFragment {
                     tasksMetadataTask.continueWith(task1 -> {
                         MetadataBuffer tasksMetadata = task1.getResult();
 
+                        if (tasksMetadata == null || tasksMetadata.getCount() == 0) {
+                            loading = false;
+                            stopLoading();
+                            Snackbar.make(getView(), R.string.no_tasks_found_import_error, Toast.LENGTH_SHORT).show();
+                            return null;
+                        }
+
                         List<DriveFolder> taskFolders = new ArrayList<>();
                         for (int i = 0; i < tasksMetadata.getCount(); i++) {
                             Metadata metadata = tasksMetadata.get(i);
@@ -224,10 +231,14 @@ public class BackupFragment extends SimpleFragment {
     }
 
     private void upload() {
+        List<TaskModel> tasks = loadTasks();
+        if (tasks == null || tasks.size() == 0) {
+            Snackbar.make(getView(), R.string.no_tasks_found_backup_error, Snackbar.LENGTH_SHORT).show();
+            return;
+        }
+
         startLoading();
         loading = true;
-
-        List<TaskModel> tasks = loadTasks();
 
         mNumberOfTasks = tasks.size();
         for (TaskModel taskModel : tasks) {

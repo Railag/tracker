@@ -30,4 +30,6 @@
     <string name="share">Share</string>
     <string name="share_text">Try Tracker app via this url: https://google.com</string>
     <string name="share_error">An Error Occurred, No Apps Available For Sharing</string>
+    <string name="no_tasks_found_backup_error">No tasks found, create some tasks before backup.</string>
+    <string name="no_tasks_found_import_error">No tasks found in backup folder, try again or choose valid folder.</string>
 </resources>

@@ -255,7 +255,7 @@ public class EditTaskFragment extends SimpleFragment {
                 Bundle extras = data.getExtras();
                 if (extras != null) {
                     Bitmap imageBitmap = (Bitmap) extras.get("data");
-                    mTakePicturePreview.setImageBitmap(imageBitmap);
+                    Glide.with(this).load(imageBitmap).into(mTakePicturePreview);
                 }
             } else {
                 loadImage(mCurrentPhotoPath);
