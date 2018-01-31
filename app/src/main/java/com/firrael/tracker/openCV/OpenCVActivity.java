@@ -169,6 +169,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     public void onCameraViewStarted(int width, int height) {
+        mOpenCVCameraView.initializeCamera();
         mOpenCVCameraView.setFocusMode(this, 6); // Continuous Picture Mode
 
         mIntermediateMat = new Mat();

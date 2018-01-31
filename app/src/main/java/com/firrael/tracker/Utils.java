@@ -165,10 +165,14 @@ public class Utils {
                     day = "Yesterday";
                     break;
                 case 2:
-                    day = "2 Days Ago";
-                    break;
                 case 3:
-                    day = "3 Days Ago";
+                case 4:
+                case 5:
+                case 6:
+                    day = daysPassed + " Days Ago";
+                    break;
+                case 7:
+                    day = "A Week Ago";
                     break;
                 default:
                     return new SimpleDateFormat(Utils.DATE_UI_FORMAT, Locale.getDefault()).format(date);
