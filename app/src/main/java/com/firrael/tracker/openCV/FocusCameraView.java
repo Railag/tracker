@@ -34,7 +34,9 @@ public class FocusCameraView extends JavaCameraView {
 
     public void initializeCamera() {
         Camera.Parameters params = mCamera.getParameters();
-        params.setPreviewSize(PREVIEW_WIDTH, PREVIEW_HEIGHT);
+        String previewSize = params.get("preview-size");
+        Log.i(TAG, "Preview size: " + previewSize);
+        //params.setPreviewSize(PREVIEW_WIDTH, PREVIEW_HEIGHT);
     }
 
     public void setFocusMode(int type) {

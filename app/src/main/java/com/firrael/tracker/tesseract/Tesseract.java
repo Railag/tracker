@@ -51,6 +51,7 @@ public class Tesseract {
     public TessBaseAPI initNewWorker() {
         TessBaseAPI worker = new TessBaseAPI();
         String language = "eng";
+    //    worker.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SPARSE_TEXT);
         worker.init(datapath, language);//Auto only        mWorkers.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO_ONLY);
         mWorkers.add(worker);
         return worker;

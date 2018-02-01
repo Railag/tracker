@@ -208,7 +208,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     public void detectTextAsync() {
         List<Bitmap> regions = detectRegions();
 
-        if (regions == null || regions.size() < 1) {
+        if (regions == null || regions.size() <= 1) {
             // no recognized regions
             mTesseract.setAvailable(true);
             Snackbar.make(mOpenCVCameraView,
