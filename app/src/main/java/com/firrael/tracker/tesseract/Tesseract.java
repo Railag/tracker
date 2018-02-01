@@ -109,12 +109,7 @@ public class Tesseract {
         return available;
     }
 
-    public List<TessBaseAPI> getWorkers() {
-        return mWorkers;
+    public void setAvailable(boolean isAvailable) {
+        this.available = isAvailable;
     }
-
-    public String getDatapath() {
-        return datapath;
-    }
-
 }

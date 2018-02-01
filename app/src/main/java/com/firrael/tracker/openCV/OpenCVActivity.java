@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -207,6 +208,16 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     public void detectTextAsync() {
         List<Bitmap> regions = detectRegions();
 
+        if (regions == null || regions.size() < 1) {
+            // no recognized regions
+            mTesseract.setAvailable(true);
+            Snackbar.make(mOpenCVCameraView,
+                    R.string.no_text_recognized_error, Snackbar.LENGTH_SHORT).show();
+            return;
+        }
+
+        mTesseract.setAvailable(false);
+
         ProgressDialog dialog = new ProgressDialog(this);
         dialog.setCancelable(false);
         dialog.setTitle(getString(R.string.loading));
@@ -247,6 +258,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                             results.add(result);
                             dialog.setProgress(dialog.getProgress() + 1);
                             if (results.size() == regions.size()) {
+                                mTesseract.setAvailable(true);
                                 dialog.dismiss();
                                 onSuccess(results);
                             }

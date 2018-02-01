@@ -31,8 +31,8 @@ import io.realm.RealmObject;
  */
 
 public class Utils {
-    public final static String DATE_FORMAT = "yyyy-MM-dd hh:mm:ss";
-    public final static String DATE_UI_FORMAT = "yyyy-mm-dd 'at' hh:mm";
+    public final static String DATE_FORMAT = "yyyy-MM-dd hh:mm:ss a";
+    public final static String DATE_UI_FORMAT = "MMM, dd 'at' hh:mm a";
 
 
     private static final int REQUEST_EXTERNAL_STORAGE = 1;

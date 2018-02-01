@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "217206679388",
+    "firebase_url": "https://api-project-217206679388.firebaseio.com",
+    "project_id": "api-project-217206679388",
+    "storage_bucket": "api-project-217206679388.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:217206679388:android:709cca1a306ac4f7",
+        "android_client_info": {
+          "package_name": "com.firrael.tracker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "217206679388-qkb5o7q4tvs5vs9btfsd8uuk1os00anp.apps.googleusercontent.com",
+          "client_type": 3
+        },
+        {
+          "client_id": "217206679388-pvi4mf489018knvv2f73cmgl6od5mv1q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.firrael.tracker",
+            "certificate_hash": "1e6af4af2d3b31abd410274935e87823888f4260"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCfpTPIkX9hbdxjYIxHJJXd06XMtRLjJAU"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "217206679388-qkb5o7q4tvs5vs9btfsd8uuk1os00anp.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
