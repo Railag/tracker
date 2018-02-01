@@ -1,5 +1,6 @@
 package com.firrael.tracker.openCV;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Build;
@@ -37,14 +38,13 @@ import org.opencv.core.Scalar;
 import org.opencv.features2d.MSER;
 import org.opencv.imgproc.Imgproc;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
+import rx.Emitter;
 import rx.Observable;
 import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action1;
 import rx.schedulers.Schedulers;
 
 import static org.opencv.android.Utils.matToBitmap;
@@ -66,6 +66,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private FocusCameraView mOpenCVCameraView;
     private Mat mGrey, mRgba, mIntermediateMat;
     private DriveResourceClient mDriveResourceClient;
+    private int mTesseractCounter;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -107,7 +108,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
 
-        mTesseract = new Tesseract(this);
+        initializeTesseract();
 
         mDriveResourceClient = App.getDrive();
 
@@ -124,12 +125,33 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mOpenCVCameraView.setCvCameraViewListener(this);
     }
 
+    private void initializeTesseract() {
+        mTesseract = new Tesseract(this);
+
+        mTesseractCounter = 0;
+        Observable
+                .range(0, Tesseract.WORKER_POOL_SIZE)
+                .subscribe(integer -> Observable.create((Action1<Emitter<Integer>>) emitter -> {
+                    mTesseract.initNewWorker();
+                    emitter.onNext(integer);
+                }, Emitter.BackpressureMode.LATEST)
+                        .subscribeOn(Schedulers.newThread())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(i -> {
+                                    Log.i(TAG, "Worker# " + i + " initialized");
+                                    mTesseractCounter++;
+                                    if (mTesseractCounter == Tesseract.WORKER_POOL_SIZE) {
+                                        Log.i(TAG, "Tesseract initialization finished");
+                                    }
+                                },
+                                OpenCVActivity.this::onError));
+    }
+
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         mGrey = inputFrame.gray();
         mRgba = inputFrame.rgba();
         mIntermediateMat = mGrey;
 
-        //    detectRegions();
         return mRgba;
     }
 
@@ -166,11 +188,16 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         super.onDestroy();
         if (mOpenCVCameraView != null)
             mOpenCVCameraView.disableView();
+
+        if (mTesseract != null) {
+            mTesseract.stopRecognition();
+            mTesseract.onDestroy();
+        }
     }
 
     public void onCameraViewStarted(int width, int height) {
         mOpenCVCameraView.initializeCamera();
-        mOpenCVCameraView.setFocusMode(this, 6); // Continuous Picture Mode
+        mOpenCVCameraView.setFocusMode(FocusCameraView.FOCUS_CONTINUOUS_PICTURE); // Continuous Picture Mode
 
         mIntermediateMat = new Mat();
         mGrey = new Mat(height, width, CvType.CV_8UC4);
@@ -180,14 +207,50 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     public void detectTextAsync() {
         List<Bitmap> regions = detectRegions();
 
-        uploadBitmapsToGoogleDrive(regions);
+        ProgressDialog dialog = new ProgressDialog(this);
+        dialog.setCancelable(false);
+        dialog.setTitle(getString(R.string.loading));
+        dialog.setMessage(getString(R.string.text_processing));
+        dialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        dialog.setIndeterminate(false);
+        dialog.setMax(regions.size() - 1); // last image in 'regions' is full image, not region
+        dialog.setProgress(0);
+        dialog.show();
 
-        Observable<List<String>> observable = mTesseract.getOCRResult(regions);
-
-        observable
+        Observable.create((Action1<Emitter<Void>>) emitter -> {
+            uploadBitmapsToGoogleDrive(regions);
+            emitter.onCompleted();
+        }, Emitter.BackpressureMode.LATEST)
                 .subscribeOn(Schedulers.newThread())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this::onSuccess, this::onError);
+                .subscribe(aVoid -> {
+                        }, this::onError,
+                        () -> Log.i(TAG, "Bitmaps uploading completed."));
+
+        regions.remove(regions.get(regions.size() - 1)); // remove latest region, full image
+
+        List<String> results = new ArrayList<>();
+
+        Observable
+                .from(regions)
+                .flatMap(Observable::just)
+                .subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(bitmap -> Observable.create((Action1<Emitter<String>>) emitter -> {
+                    String result = mTesseract.processImage(bitmap);
+                    emitter.onNext(result);
+                }, Emitter.BackpressureMode.LATEST)
+                        .subscribeOn(Schedulers.newThread())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(result -> {
+                            Log.i(TAG, "Result " + result);
+                            results.add(result);
+                            dialog.setProgress(dialog.getProgress() + 1);
+                            if (results.size() == regions.size()) {
+                                dialog.dismiss();
+                                onSuccess(results);
+                            }
+                        }, this::onError));
     }
 
     private void onError(Throwable throwable) {
@@ -274,10 +337,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                 Log.d(TAG, "cropped part data error " + e.getMessage());
             }
             if (bmp != null) {
-                //    recognize(bmp);
                 bitmapsToRecognize.add(bmp);
-                //bmp.recycle();
-                //Log.i(TAG, "Result: " + result);
             }
         }
 

@@ -15,10 +15,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import rx.Emitter;
 import rx.Observable;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
 
 /**
  * Created by railag on 27.12.2017.
@@ -27,9 +24,13 @@ import rx.schedulers.Schedulers;
 public class Tesseract {
     private final static String TAG = Tesseract.class.getSimpleName();
 
+    public final static int WORKER_POOL_SIZE = 50;
+
     private String datapath;
-    private TessBaseAPI mTess;
+    private List<TessBaseAPI> mWorkers;
     Context context;
+
+    private static int sCurrentWorker = 0;
 
     private boolean available = true;
 
@@ -44,34 +45,48 @@ public class Tesseract {
             copyFile(context);
         }
 
-        mTess = new TessBaseAPI();
+        mWorkers = new ArrayList<>();
+    }
+
+    public TessBaseAPI initNewWorker() {
+        TessBaseAPI worker = new TessBaseAPI();
         String language = "eng";
-        mTess.init(datapath, language);//Auto only        mTess.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO_ONLY);
+        worker.init(datapath, language);//Auto only        mWorkers.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO_ONLY);
+        mWorkers.add(worker);
+        return worker;
+    }
+
+
+    private TessBaseAPI takeWorker() {
+        if (mWorkers != null && mWorkers.size() > sCurrentWorker) {
+            TessBaseAPI worker = mWorkers.get(sCurrentWorker);
+            sCurrentWorker++;
+            return worker;
+        } else {
+            return initNewWorker();
+        }
     }
 
     public void stopRecognition() {
-        mTess.stop();
+        for (TessBaseAPI worker : mWorkers) {
+            worker.stop();
+        }
     }
 
-    public Observable<List<String>> getOCRResult(List<Bitmap> bitmaps) {
-        available = false;
-
-        return Observable.create(objectEmitter -> {
-            List<String> results = new ArrayList<>();
-            for (Bitmap b : bitmaps) {
-                mTess.setImage(b);
-                String result = mTess.getUTF8Text();
-                results.add(result);
-            }
-            objectEmitter.onNext(results);
-            objectEmitter.onCompleted();
-            available = true;
-        }, Emitter.BackpressureMode.LATEST);
+    public String processImage(Bitmap bitmap) {
+        TessBaseAPI worker = takeWorker();
+        worker.setImage(bitmap);
+        String result = worker.getUTF8Text();
+        Log.i(TAG, "worker just finished");
+        return result;
     }
 
     public void onDestroy() {
-        if (mTess != null)
-            mTess.end();
+        if (mWorkers != null) {
+            for (TessBaseAPI worker : mWorkers) {
+                worker.end();
+            }
+        }
     }
 
     private void copyFile(Context context) {
@@ -92,6 +107,14 @@ public class Tesseract {
 
     public boolean isAvailable() {
         return available;
+    }
+
+    public List<TessBaseAPI> getWorkers() {
+        return mWorkers;
+    }
+
+    public String getDatapath() {
+        return datapath;
     }
 
 }

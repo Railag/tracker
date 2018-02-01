@@ -19,6 +19,14 @@ public class FocusCameraView extends JavaCameraView {
     private final static int PREVIEW_WIDTH = 800;
     private final static int PREVIEW_HEIGHT = 600;
 
+    public final static int FOCUS_AUTO = 0;
+    public final static int FOCUS_CONTINUOUS_VIDEO = 1;
+    public final static int FOCUS_EDOF = 2;
+    public final static int FOCUS_FIXED = 3;
+    public final static int FOCUS_INFINITY = 4;
+    public final static int FOCUS_MACRO = 5;
+    public final static int FOCUS_CONTINUOUS_PICTURE = 6;
+
     public FocusCameraView(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
@@ -29,7 +37,7 @@ public class FocusCameraView extends JavaCameraView {
         params.setPreviewSize(PREVIEW_WIDTH, PREVIEW_HEIGHT);
     }
 
-    public void setFocusMode(Context item, int type) {
+    public void setFocusMode(int type) {
 
         Camera.Parameters params = mCamera.getParameters();
         mCamera.cancelAutoFocus();
@@ -39,13 +47,13 @@ public class FocusCameraView extends JavaCameraView {
         List<String> FocusModes = params.getSupportedFocusModes();
 
         switch (type) {
-            case 0:
+            case FOCUS_AUTO:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 else
                     Log.i(TAG, "Auto Mode is not supported");
                 break;
-            case 1:
+            case FOCUS_CONTINUOUS_VIDEO:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
                 else {
@@ -54,7 +62,7 @@ public class FocusCameraView extends JavaCameraView {
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 }
                 break;
-            case 2:
+            case FOCUS_EDOF:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_EDOF))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_EDOF);
                 else {
@@ -63,7 +71,7 @@ public class FocusCameraView extends JavaCameraView {
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 }
                 break;
-            case 3:
+            case FOCUS_FIXED:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_FIXED))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_FIXED);
                 else {
@@ -72,7 +80,7 @@ public class FocusCameraView extends JavaCameraView {
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 }
                 break;
-            case 4:
+            case FOCUS_INFINITY:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_INFINITY))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_INFINITY);
                 else {
@@ -81,7 +89,7 @@ public class FocusCameraView extends JavaCameraView {
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 }
                 break;
-            case 5:
+            case FOCUS_MACRO:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_MACRO))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
                 else {
@@ -90,7 +98,7 @@ public class FocusCameraView extends JavaCameraView {
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 }
                 break;
-            case 6:
+            case FOCUS_CONTINUOUS_PICTURE:
                 if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
                 else {
