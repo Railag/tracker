@@ -40,8 +40,6 @@ import com.google.android.gms.drive.DriveResourceClient;
 import com.google.android.gms.tasks.Task;
 import com.wang.avi.AVLoadingIndicatorView;
 
-import org.opencv.android.OpenCVLoader;
-
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
 
@@ -104,6 +102,10 @@ public class MainActivity extends AppCompatActivity
 
         toSplash();
 
+        signIn();
+    }
+
+    private void signIn() {
         mGoogleSignInClient = buildGoogleSignInClient();
 
         try {
@@ -263,10 +265,10 @@ public class MainActivity extends AppCompatActivity
         Intent intent = new Intent();
         intent.setAction(Intent.ACTION_SEND);
         intent.putExtra(Intent.EXTRA_TEXT, getString(R.string.share_text));
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, "text/plain");
+        intent.setType("text/plain");
         PackageManager packageManager = getPackageManager();
         if (intent.resolveActivity(packageManager) != null) {
-            startActivity(intent);
+            startActivity(Intent.createChooser(intent, "Select app for sharing"));
         } else {
             Snackbar.make(toolbar, R.string.share_error, Snackbar.LENGTH_SHORT).show();
         }
@@ -303,6 +305,8 @@ public class MainActivity extends AppCompatActivity
                         Log.i(TAG, "Sign in success");
                     } catch (ApiException e) {
                         Log.e(TAG, "signInResult:failed code=" + e.getStatusCode());
+                        Snackbar.make(toolbar, R.string.google_drive_login_message, Snackbar.LENGTH_SHORT).show();
+                        signIn();
                     }
 
                     return null;

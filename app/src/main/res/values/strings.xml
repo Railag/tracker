@@ -37,4 +37,5 @@
     <string name="no_text_recognized_error">No text found on the image, try again</string>
     <string name="language_changed">Language changed.</string>
     <string name="select_language_for_opencv_recognition">Select language for OpenCV recognition.</string>
+    <string name="google_drive_login_message">You need to log in using Google Drive in order to use application.</string>
 </resources>
