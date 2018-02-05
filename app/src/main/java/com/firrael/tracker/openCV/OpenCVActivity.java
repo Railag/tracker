@@ -119,12 +119,14 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mDriveResourceClient = App.getDrive();
 
         mOpenCVCameraView = findViewById(R.id.javaCameraView);
-        mOpenCVCameraView.setOnClickListener(v1 -> {
+        mOpenCVCameraView.setOnLongClickListener(v1 -> {
             if (mTesseract.isAvailable()) {
                 detectTextAsync();
             } else {
                 Toast.makeText(this, "Wait till previous recognition is finished", Toast.LENGTH_SHORT).show();
             }
+
+            return true;
         });
 
         mOpenCVCameraView.setVisibility(View.VISIBLE);
@@ -401,6 +403,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             return null;
         });
     }
+
+
 
     private void addGoogleDriveImage(Bitmap image, String name, String folderName) {
         final Task<DriveContents> createContentsTask = mDriveResourceClient.createContents();

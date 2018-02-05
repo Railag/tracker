@@ -168,8 +168,10 @@ public class NewTaskFragment extends SimpleFragment {
             mRecognizer.stopListening();
         }
 
-        mVoiceIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_keyboard_voice_black_76dp));
-        mVoiceIcon.setOnClickListener(v1 -> startVoice());
+        if (mVoiceIcon != null && getActivity() != null) {
+            mVoiceIcon.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_keyboard_voice_black_76dp));
+            mVoiceIcon.setOnClickListener(v1 -> startVoice());
+        }
     }
 
     private void toggleFab(boolean isValid) {

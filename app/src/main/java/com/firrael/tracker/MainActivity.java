@@ -268,7 +268,7 @@ public class MainActivity extends AppCompatActivity
         intent.setType("text/plain");
         PackageManager packageManager = getPackageManager();
         if (intent.resolveActivity(packageManager) != null) {
-            startActivity(Intent.createChooser(intent, "Select app for sharing"));
+            startActivity(Intent.createChooser(intent, getString(R.string.sharing_message)));
         } else {
             Snackbar.make(toolbar, R.string.share_error, Snackbar.LENGTH_SHORT).show();
         }
