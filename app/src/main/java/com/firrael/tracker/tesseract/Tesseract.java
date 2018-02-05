@@ -28,17 +28,37 @@ public class Tesseract {
 
     private String datapath;
     private List<TessBaseAPI> mWorkers;
+    private Language language;
     Context context;
 
     private static int sCurrentWorker = 0;
 
     private boolean available = true;
 
-    public Tesseract(Context context) {
+    public enum Language {
+        EN("eng"),
+        RU("rus");
+
+        public final static Language[] LANGUAGES = new Language[]{EN, RU};
+
+        private String localeTag;
+
+        Language(String localeTag) {
+            this.localeTag = localeTag;
+        }
+
+        public String getLocaleTag() {
+            return localeTag;
+        }
+    }
+
+    public Tesseract(Context context, Language language) {
         this.context = context;
         datapath = Environment.getExternalStorageDirectory() + "/ocrctz/";
+        this.language = language;
         File dir = new File(datapath + "/tessdata/");
-        File file = new File(datapath + "/tessdata/" + "eng.traineddata");
+        //    File file = new File(datapath + "/tessdata/" + "eng.traineddata");
+        File file = new File(datapath + "/tessdata/" + language.getLocaleTag() + ".traineddata");
         if (!file.exists()) {
             Log.d(TAG, "in file doesn't exist");
             dir.mkdirs();
@@ -50,8 +70,8 @@ public class Tesseract {
 
     public TessBaseAPI initNewWorker() {
         TessBaseAPI worker = new TessBaseAPI();
-        String language = "eng";
-    //    worker.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SPARSE_TEXT);
+        String language = this.language.getLocaleTag();
+        //    worker.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SPARSE_TEXT);
         worker.init(datapath, language);//Auto only        mWorkers.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO_ONLY);
         mWorkers.add(worker);
         return worker;
@@ -93,8 +113,8 @@ public class Tesseract {
     private void copyFile(Context context) {
         AssetManager assetManager = context.getAssets();
         try {
-            InputStream in = assetManager.open("eng.traineddata");
-            OutputStream out = new FileOutputStream(datapath + "/tessdata/" + "eng.traineddata");
+            InputStream in = assetManager.open(language.getLocaleTag() + ".traineddata");
+            OutputStream out = new FileOutputStream(datapath + "/tessdata/" + language.getLocaleTag() + ".traineddata");
             byte[] buffer = new byte[1024];
             int read = in.read(buffer);
             while (read != -1) {

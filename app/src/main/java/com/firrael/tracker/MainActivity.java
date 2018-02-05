@@ -214,6 +214,10 @@ public class MainActivity extends AppCompatActivity
         setFragment(BackupFragment.newInstance());
     }
 
+    public void toSettings() {
+        setFragment(SettingsFragment.newInstance());
+    }
+
     public void toLanding() {
         setFragment(LandingTaskFragment.newInstance());
     }
@@ -243,7 +247,7 @@ public class MainActivity extends AppCompatActivity
         } else if (id == R.id.nav_add_task) {
             toNewTask();
         } else if (id == R.id.nav_settings) {
-            // TODO
+            toSettings();
         } else if (id == R.id.nav_share) {
             shareApp();
         } else if (id == R.id.nav_backup) {

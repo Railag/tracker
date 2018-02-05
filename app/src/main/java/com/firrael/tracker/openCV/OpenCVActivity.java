@@ -7,6 +7,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
@@ -16,6 +17,7 @@ import android.widget.Toast;
 import com.firrael.tracker.App;
 import com.firrael.tracker.DriveUtils;
 import com.firrael.tracker.R;
+import com.firrael.tracker.SettingsFragment;
 import com.firrael.tracker.Utils;
 import com.firrael.tracker.tesseract.Tesseract;
 import com.google.android.gms.drive.DriveContents;
@@ -68,6 +70,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private Mat mGrey, mRgba, mIntermediateMat;
     private DriveResourceClient mDriveResourceClient;
     private int mTesseractCounter;
+    private Tesseract.Language mLanguage;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -93,6 +96,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_opencv);
+
+        initializeLanguage();
 
         Window window = getWindow();
 
@@ -126,8 +131,24 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mOpenCVCameraView.setCvCameraViewListener(this);
     }
 
+    private void initializeLanguage() {
+        String langKey = Utils.prefs(this).getString(SettingsFragment.LANGUAGE_KEY, "");
+        if (TextUtils.isEmpty(langKey)) {
+            mLanguage = Tesseract.Language.EN;
+        } else {
+            Tesseract.Language[] languages = Tesseract.Language.LANGUAGES;
+            for (Tesseract.Language language : languages) {
+                mLanguage = language;
+            }
+
+            if (mLanguage == null) {
+                mLanguage = Tesseract.Language.EN;
+            }
+        }
+    }
+
     private void initializeTesseract() {
-        mTesseract = new Tesseract(this);
+        mTesseract = new Tesseract(this, mLanguage);
 
         mTesseractCounter = 0;
         Observable
