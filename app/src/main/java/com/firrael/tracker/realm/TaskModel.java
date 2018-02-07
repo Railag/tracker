@@ -5,10 +5,10 @@ import android.os.Parcelable;
 import android.text.TextUtils;
 
 import com.firrael.tracker.Utils;
+import com.firrael.tracker.tesseract.RecognizedRegion;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -35,7 +35,7 @@ public class TaskModel extends RealmObject implements Parcelable {
 
     // attached content
     private String imageUrl;
-    private RealmList<String> openCVScanData;
+    private RealmList<RecognizedRegion> openCVScanData;
 
     public TaskModel() {
     }
@@ -54,7 +54,6 @@ public class TaskModel extends RealmObject implements Parcelable {
         endDate = in.readString();
         status = in.readInt();
         imageUrl = in.readString();
-        in.readStringList(openCVScanData);
     }
 
     @Override
@@ -65,7 +64,6 @@ public class TaskModel extends RealmObject implements Parcelable {
         dest.writeString(endDate);
         dest.writeInt(status);
         dest.writeString(imageUrl);
-        dest.writeStringList(openCVScanData);
     }
 
     @Override
@@ -139,11 +137,11 @@ public class TaskModel extends RealmObject implements Parcelable {
         this.imageUrl = imageUrl;
     }
 
-    public List<String> getOpenCVScanData() {
+    public List<RecognizedRegion> getOpenCVScanData() {
         return openCVScanData;
     }
 
-    public void setOpenCVScanData(List<String> openCVScanData) {
+    public void setOpenCVScanData(List<RecognizedRegion> openCVScanData) {
         this.openCVScanData = new RealmList<>();
         this.openCVScanData.addAll(openCVScanData);
     }

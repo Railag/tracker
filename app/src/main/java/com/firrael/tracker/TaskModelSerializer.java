@@ -1,6 +1,7 @@
 package com.firrael.tracker;
 
 import com.firrael.tracker.realm.TaskModel;
+import com.firrael.tracker.tesseract.RecognizedRegion;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
@@ -27,6 +28,8 @@ class TaskModelSerializer implements JsonSerializer<TaskModel>, JsonDeserializer
     private final static String END_DATE = "end_date";
     private final static String IMAGE_URL = "image_url";
     private final static String OPENCV_DATA = "opencv_data";
+    private final static String REGION_ID = "region_id";
+    private final static String REGION_LINE = "region_line";
 
     @Override
     public JsonElement serialize(TaskModel task, Type typeOfSrc, JsonSerializationContext context) {
@@ -38,8 +41,11 @@ class TaskModelSerializer implements JsonSerializer<TaskModel>, JsonDeserializer
         jsonObject.addProperty(END_DATE, task.getEndDate());
         jsonObject.addProperty(IMAGE_URL, task.getImageUrl());
         JsonArray scanData = new JsonArray();
-        for (String data : task.getOpenCVScanData()) {
-            scanData.add(data);
+        for (RecognizedRegion region : task.getOpenCVScanData()) {
+            JsonObject regionObj = new JsonObject();
+            regionObj.addProperty(REGION_ID, region.getRegionNumber());
+            regionObj.addProperty(REGION_LINE, region.getRecognizedLine());
+            scanData.add(regionObj);
         }
         jsonObject.add(OPENCV_DATA, scanData);
         return jsonObject;
@@ -79,11 +85,21 @@ class TaskModelSerializer implements JsonSerializer<TaskModel>, JsonDeserializer
         }
 
         if (obj.has(OPENCV_DATA)) {
-            List<String> data = new ArrayList<>();
+            List<RecognizedRegion> data = new ArrayList<>();
             JsonArray scanData = obj.getAsJsonArray(OPENCV_DATA);
-            for (JsonElement scanLine : scanData) {
-                String line = scanLine.getAsString();
-                data.add(line);
+            for (JsonElement regionElement : scanData) {
+                RecognizedRegion region = new RecognizedRegion();
+                JsonObject regionObj = regionElement.getAsJsonObject();
+
+                if (regionObj.has(REGION_ID)) {
+                    region.setRegionNumber(regionObj.get(REGION_ID).getAsInt());
+                }
+
+                if (regionObj.has(REGION_LINE)) {
+                    region.setRecognizedLine(regionObj.get(REGION_LINE).getAsString());
+                }
+
+                data.add(region);
             }
 
             taskModel.setOpenCVScanData(data);

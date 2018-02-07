@@ -21,17 +21,12 @@ import com.firrael.tracker.base.SimpleFragment;
 import com.firrael.tracker.openCV.OpenCVActivity;
 import com.firrael.tracker.realm.RealmDB;
 import com.firrael.tracker.realm.TaskModel;
+import com.firrael.tracker.tesseract.RecognizedRegion;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
-import io.realm.Realm;
 import io.realm.RealmResults;
 
 import static android.app.Activity.RESULT_OK;
@@ -76,7 +71,7 @@ public class EditTaskFragment extends SimpleFragment {
 
     private String mCurrentPhotoPath;
 
-    private List<String> mCurrentScanData;
+    private List<RecognizedRegion> mCurrentScanData;
 
     @Override
     protected String getTitle() {
@@ -243,7 +238,7 @@ public class EditTaskFragment extends SimpleFragment {
             Utils.verifyStoragePermissions(getActivity());
             return;
         }
-        
+
         Intent intent = new Intent(getMainActivity(), OpenCVActivity.class);
         startActivityForResult(intent, REQUEST_DOCUMENT_SCAN);
     }
@@ -265,7 +260,7 @@ public class EditTaskFragment extends SimpleFragment {
             if (data != null) {
                 Bundle extras = data.getExtras();
                 if (extras != null) {
-                    mCurrentScanData = extras.getStringArrayList(OpenCVActivity.KEY_SCAN_RESULTS);
+                    mCurrentScanData = extras.getParcelableArrayList(OpenCVActivity.KEY_SCAN_RESULTS);
                     if (mCurrentScanData != null && mCurrentScanData.size() > 0) {
                         loadScan(mCurrentScanData);
                         mHasScan = true;
@@ -280,12 +275,12 @@ public class EditTaskFragment extends SimpleFragment {
         Glide.with(this).load(uri).into(mTakePicturePreview);
     }
 
-    private void loadScan(List<String> openCVData) {
+    private void loadScan(List<RecognizedRegion> openCVData) {
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < openCVData.size(); i++) {
-            String line = openCVData.get(i);
+            RecognizedRegion line = openCVData.get(i);
             builder.append("region#");
-            builder.append(i);
+            builder.append(line.getRegionNumber());
             builder.append(": ");
             builder.append(line);
             builder.append("\n");

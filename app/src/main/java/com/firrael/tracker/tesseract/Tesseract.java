@@ -2,10 +2,10 @@ package com.firrael.tracker.tesseract;
 
 import android.content.Context;
 import android.content.res.AssetManager;
-import android.graphics.Bitmap;
 import android.os.Environment;
 import android.util.Log;
 
+import com.firrael.tracker.openCV.BitmapRegion;
 import com.googlecode.tesseract.android.TessBaseAPI;
 
 import java.io.File;
@@ -14,8 +14,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
-
-import rx.Observable;
 
 /**
  * Created by railag on 27.12.2017.
@@ -100,18 +98,13 @@ public class Tesseract {
         }
     }
 
-/*    public void stopRecognition() {
-        for (TessBaseAPI worker : mWorkers) {
-            worker.stop();
-        }
-    }*/
-
-    public String processImage(Bitmap bitmap) {
+    public RecognizedRegion processImage(BitmapRegion bitmapRegion) {
         TessBaseAPI worker = takeWorker();
-        worker.setImage(bitmap);
+        worker.setImage(bitmapRegion.getBitmap());
         String result = worker.getUTF8Text();
-        Log.i(TAG, "worker just finished");
-        return result;
+        RecognizedRegion region = new RecognizedRegion(bitmapRegion.getRegionNumber(), result);
+        Log.i(TAG, "worker with region#" + region.getRegionNumber() + " just finished");
+        return region;
     }
 
     public void onDestroy() {

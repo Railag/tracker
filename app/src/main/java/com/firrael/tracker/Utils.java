@@ -13,6 +13,7 @@ import android.util.DisplayMetrics;
 import android.view.inputmethod.InputMethodManager;
 
 import com.firrael.tracker.realm.TaskModel;
+import com.firrael.tracker.tesseract.RecognizedRegion;
 import com.google.gson.ExclusionStrategy;
 import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
@@ -137,6 +138,9 @@ public class Utils {
 
                     @Override
                     public boolean shouldSkipClass(Class<?> clazz) {
+                        if (clazz == RecognizedRegion.class) {
+                            return true;
+                        }
                         return false;
                     }
                 })

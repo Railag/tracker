@@ -18,6 +18,7 @@ import com.firrael.tracker.base.SimpleFragment;
 import com.firrael.tracker.openCV.OpenCVActivity;
 import com.firrael.tracker.realm.RealmDB;
 import com.firrael.tracker.realm.TaskModel;
+import com.firrael.tracker.tesseract.RecognizedRegion;
 
 import java.io.File;
 import java.io.IOException;
@@ -68,7 +69,7 @@ public class AttachFragment extends SimpleFragment {
 
     private String mCurrentPhotoPath;
 
-    private List<String> mCurrentScanData;
+    private List<RecognizedRegion> mCurrentScanData;
 
     @Override
     protected String getTitle() {
@@ -207,7 +208,7 @@ public class AttachFragment extends SimpleFragment {
             if (data != null) {
                 Bundle extras = data.getExtras();
                 if (extras != null) {
-                    mCurrentScanData = extras.getStringArrayList(OpenCVActivity.KEY_SCAN_RESULTS);
+                    mCurrentScanData = extras.getParcelableArrayList(OpenCVActivity.KEY_SCAN_RESULTS);
                     if (mCurrentScanData != null && mCurrentScanData.size() > 0) {
                         loadScan(mCurrentScanData);
                         mHasScan = true;
@@ -222,9 +223,13 @@ public class AttachFragment extends SimpleFragment {
         Glide.with(this).load(uri).into(mTakePicturePreview);
     }
 
-    private void loadScan(List<String> openCVData) {
+    private void loadScan(List<RecognizedRegion> openCVData) {
         StringBuilder builder = new StringBuilder();
-        for (String line : openCVData) {
+        for (int i = 0; i < openCVData.size(); i++) {
+            RecognizedRegion line = openCVData.get(i);
+            builder.append("region#");
+            builder.append(line.getRegionNumber());
+            builder.append(": ");
             builder.append(line);
             builder.append("\n");
         }

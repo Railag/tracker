@@ -19,6 +19,7 @@ import com.firrael.tracker.DriveUtils;
 import com.firrael.tracker.R;
 import com.firrael.tracker.SettingsFragment;
 import com.firrael.tracker.Utils;
+import com.firrael.tracker.tesseract.RecognizedRegion;
 import com.firrael.tracker.tesseract.Tesseract;
 import com.google.android.gms.drive.DriveContents;
 import com.google.android.gms.drive.DriveFolder;
@@ -42,6 +43,8 @@ import org.opencv.features2d.MSER;
 import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import rx.Emitter;
@@ -254,14 +257,20 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     public void detectTextAsync() {
-        List<Bitmap> regions = detectRegions();
+        BitmapResults bitmapResults = detectRegions();
+        List<Bitmap> bitmapRegions = bitmapResults.getRegions();
 
-        if (regions == null || regions.size() <= 1) {
+        if (bitmapRegions == null || bitmapRegions.size() == 0) {
             // no recognized regions
             mTesseract.setAvailable(true);
             Snackbar.make(mOpenCVCameraView,
                     R.string.no_text_recognized_error, Snackbar.LENGTH_SHORT).show();
             return;
+        }
+
+        List<BitmapRegion> regions = new ArrayList<>();
+        for (int i = 0; i < bitmapRegions.size(); i++) {
+            regions.add(new BitmapRegion(i, bitmapRegions.get(i)));
         }
 
         mTesseract.setAvailable(false);
@@ -272,12 +281,12 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         dialog.setMessage(getString(R.string.text_processing));
         dialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
         dialog.setIndeterminate(false);
-        dialog.setMax(regions.size() - 1); // last image in 'regions' is full image, not region
+        dialog.setMax(regions.size()); // last image in 'regions' is full image, not region
         dialog.setProgress(0);
         dialog.show();
 
         Observable.create((Action1<Emitter<Void>>) emitter -> {
-            uploadBitmapsToGoogleDrive(regions);
+            uploadBitmapsToGoogleDrive(regions, bitmapResults.getSourceBitmap());
             emitter.onCompleted();
         }, Emitter.BackpressureMode.LATEST)
                 .subscribeOn(Schedulers.newThread())
@@ -286,18 +295,16 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                         }, this::onError,
                         () -> Log.i(TAG, "Bitmaps uploading completed."));
 
-        regions.remove(regions.get(regions.size() - 1)); // remove latest region, full image
-
-        List<String> results = new ArrayList<>();
+        List<RecognizedRegion> results = new ArrayList<>();
 
         Observable
                 .from(regions)
                 .flatMap(Observable::just)
                 .subscribeOn(Schedulers.newThread())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(bitmap -> Observable.create((Action1<Emitter<String>>) emitter -> {
-                    String result = mTesseract.processImage(bitmap);
-                    emitter.onNext(result);
+                .subscribe(bitmapRegion -> Observable.create((Action1<Emitter<RecognizedRegion>>) emitter -> {
+                    RecognizedRegion region = mTesseract.processImage(bitmapRegion);
+                    emitter.onNext(region);
                 }, Emitter.BackpressureMode.LATEST)
                         .subscribeOn(Schedulers.newThread())
                         .observeOn(AndroidSchedulers.mainThread())
@@ -317,16 +324,17 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         throwable.printStackTrace();
     }
 
-    private void onSuccess(List<String> s) {
+    private void onSuccess(List<RecognizedRegion> s) {
+        Collections.sort(s);
         Log.i(TAG, "Results: " + s);
         Intent data = new Intent();
-        ArrayList<String> results = new ArrayList<>(s);
-        data.putStringArrayListExtra(KEY_SCAN_RESULTS, results);
+        ArrayList<RecognizedRegion> results = new ArrayList<>(s);
+        data.putParcelableArrayListExtra(KEY_SCAN_RESULTS, results);
         setResult(RESULT_OK, data);
         finish();
     }
 
-    private List<Bitmap> detectRegions() {
+    private BitmapResults detectRegions() {
         MatOfKeyPoint keypoint = new MatOfKeyPoint();
         List<KeyPoint> listpoint;
         KeyPoint kpoint;
@@ -381,6 +389,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         Imgproc.findContours(morbyte, contour2, hierarchy,
                 Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
 
+        Collections.reverse(contour2);
+
         List<Bitmap> bitmapsToRecognize = new ArrayList<>();
 
         for (int ind = 0; ind < contour2.size(); ind++) {
@@ -401,11 +411,12 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             }
         }
 
-        Bitmap b = Bitmap.createBitmap(mGrey.width(), mGrey.height(), Bitmap.Config.ARGB_8888);
-        matToBitmap(mGrey, b);
-        bitmapsToRecognize.add(b);
+        Bitmap sourceImage = Bitmap.createBitmap(mGrey.width(), mGrey.height(), Bitmap.Config.ARGB_8888);
+        matToBitmap(mGrey, sourceImage);
 
-        return bitmapsToRecognize;
+        BitmapResults results = new BitmapResults(bitmapsToRecognize, sourceImage);
+
+        return results;
     }
 
     @Override
@@ -413,7 +424,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         Log.i(TAG, "onCameraViewStopped called");
     }
 
-    public void uploadBitmapsToGoogleDrive(List<Bitmap> regions) {
+    public void uploadBitmapsToGoogleDrive(List<BitmapRegion> regions, Bitmap sourceBitmap) {
         String timeStamp = Utils.getCurrentTimestamp();
         final String folderName = timeStamp + " openCV";
 
@@ -422,8 +433,11 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             DriveFolder parentFolder = folderTask.getResult();
 
             for (int i = 0; i < regions.size(); i++) {
-                addGoogleDriveImage(regions.get(i), "region #" + i, folderName);
+                BitmapRegion region = regions.get(i);
+                addGoogleDriveImage(region.getBitmap(), "region #" + region.getRegionNumber(), folderName);
             }
+
+            addGoogleDriveImage(sourceBitmap, "source image", folderName);
 
             return null;
         });
