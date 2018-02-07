@@ -81,7 +81,6 @@ public class FocusCameraView extends JavaCameraView {
 
             mCamera.setParameters(parameters);
             mCamera.autoFocus((b, camera) -> {
-
             });
         }
     }
@@ -90,7 +89,7 @@ public class FocusCameraView extends JavaCameraView {
      * Convert touch position x:y to {@link Camera.Area} position -1000:-1000 to 1000:1000.
      */
     private android.graphics.Rect calculateTapArea(float x, float y, float coefficient) {
-        float focusAreaSize = 72; // TODO update
+        float focusAreaSize = 72; // TODO update?
         int areaSize = Float.valueOf(focusAreaSize * coefficient).intValue();
 
         int left = clamp((int) x - areaSize / 2, 0, getWidth() - areaSize);
@@ -104,7 +103,7 @@ public class FocusCameraView extends JavaCameraView {
         final int r = clamp(Math.round(rectF.right), -900, 1000);
         final int b = clamp(Math.round(rectF.bottom), -900, 1000);
 
-            return new android.graphics.Rect(l, t, r, b);
+        return new android.graphics.Rect(l, t, r, b);
         //return new android.graphics.Rect((int) rectF.left, (int) rectF.top, (int) rectF.right, (int) rectF.bottom);
     }
 
@@ -125,66 +124,66 @@ public class FocusCameraView extends JavaCameraView {
         mCamera.autoFocus((b, camera) -> {
         });
 
-        List<String> FocusModes = params.getSupportedFocusModes();
+        List<String> focusModes = params.getSupportedFocusModes();
 
         switch (type) {
             case FOCUS_AUTO:
-                if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                if (focusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 else
                     Log.i(TAG, "Auto Mode is not supported");
                 break;
             case FOCUS_CONTINUOUS_VIDEO:
-                if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO))
+                if (focusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
                 else {
                     Log.i(TAG, "Continuous Mode is not supported");
-                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                    if (focusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 }
                 break;
             case FOCUS_EDOF:
-                if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_EDOF))
+                if (focusModes.contains(Camera.Parameters.FOCUS_MODE_EDOF))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_EDOF);
                 else {
                     Log.i(TAG, "EDOF Mode is not supported");
-                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                    if (focusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 }
                 break;
             case FOCUS_FIXED:
-                if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_FIXED))
+                if (focusModes.contains(Camera.Parameters.FOCUS_MODE_FIXED))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_FIXED);
                 else {
                     Log.i(TAG, "Fixed Mode is not supported");
-                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                    if (focusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 }
                 break;
             case FOCUS_INFINITY:
-                if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_INFINITY))
+                if (focusModes.contains(Camera.Parameters.FOCUS_MODE_INFINITY))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_INFINITY);
                 else {
                     Log.i(TAG, "Infinity Mode is not supported");
-                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                    if (focusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 }
                 break;
             case FOCUS_MACRO:
-                if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_MACRO))
+                if (focusModes.contains(Camera.Parameters.FOCUS_MODE_MACRO))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
                 else {
                     Log.i(TAG, "Macro Mode is not supported");
-                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                    if (focusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 }
                 break;
             case FOCUS_CONTINUOUS_PICTURE:
-                if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE))
+                if (focusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE))
                     params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
                 else {
                     Log.i(TAG, "Continuous Picture Mode is not supported");
-                    if (FocusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
+                    if (focusModes.contains(Camera.Parameters.FOCUS_MODE_AUTO))
                         params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 }
                 break;

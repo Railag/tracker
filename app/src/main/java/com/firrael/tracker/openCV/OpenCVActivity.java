@@ -47,8 +47,10 @@ import java.util.List;
 import rx.Emitter;
 import rx.Observable;
 import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.schedulers.Schedulers;
+import rx.subscriptions.CompositeSubscription;
 
 import static org.opencv.android.Utils.matToBitmap;
 
@@ -71,6 +73,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private DriveResourceClient mDriveResourceClient;
     private int mTesseractCounter;
     private Tesseract.Language mLanguage;
+    private CompositeSubscription mSubscription;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -96,6 +99,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_opencv);
+
+        mSubscription = new CompositeSubscription();
 
         initializeLanguage();
 
@@ -134,13 +139,16 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     private void initializeLanguage() {
-        String langKey = Utils.prefs(this).getString(SettingsFragment.LANGUAGE_KEY, "");
-        if (TextUtils.isEmpty(langKey)) {
+        String savedLanguage = Utils.prefs(this).getString(SettingsFragment.LANGUAGE_KEY, "");
+        if (TextUtils.isEmpty(savedLanguage)) {
             mLanguage = Tesseract.Language.EN;
         } else {
             Tesseract.Language[] languages = Tesseract.Language.LANGUAGES;
             for (Tesseract.Language language : languages) {
-                mLanguage = language;
+                if (language.getLocaleTag().equalsIgnoreCase(savedLanguage)) {
+                    mLanguage = language;
+                    break;
+                }
             }
 
             if (mLanguage == null) {
@@ -153,22 +161,37 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mTesseract = new Tesseract(this, mLanguage);
 
         mTesseractCounter = 0;
-        Observable
+
+
+        mSubscription.add(Observable
                 .range(0, Tesseract.WORKER_POOL_SIZE)
-                .subscribe(integer -> Observable.create((Action1<Emitter<Integer>>) emitter -> {
-                    mTesseract.initNewWorker();
-                    emitter.onNext(integer);
-                }, Emitter.BackpressureMode.LATEST)
-                        .subscribeOn(Schedulers.newThread())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(i -> {
-                                    Log.i(TAG, "Worker# " + i + " initialized");
-                                    mTesseractCounter++;
-                                    if (mTesseractCounter == Tesseract.WORKER_POOL_SIZE) {
-                                        Log.i(TAG, "Tesseract initialization finished");
-                                    }
-                                },
-                                OpenCVActivity.this::onError));
+                .subscribe(integer -> {
+                    Observable<Integer> observable = getInitNewWorkerObservable(integer);
+                    observable.doOnUnsubscribe(new Action0() {
+                        @Override
+                        public void call() {
+
+                        }
+                    });
+                    mSubscription.add(observable.subscribeOn(Schedulers.newThread())
+                            .observeOn(AndroidSchedulers.mainThread())
+                            .subscribe(this::getCreatedObservable, OpenCVActivity.this::onError));
+                }));
+    }
+
+    private Observable<Integer> getInitNewWorkerObservable(int integer) {
+        return Observable.create(emitter -> {
+            mTesseract.initNewWorker();
+            emitter.onNext(integer);
+        }, Emitter.BackpressureMode.LATEST);
+    }
+
+    private void getCreatedObservable(int i) {
+        Log.i(TAG, "Worker# " + i + " initialized");
+        mTesseractCounter++;
+        if (mTesseractCounter == Tesseract.WORKER_POOL_SIZE) {
+            Log.i(TAG, "Tesseract initialization finished");
+        }
     }
 
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
@@ -214,7 +237,9 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             mOpenCVCameraView.disableView();
 
         if (mTesseract != null) {
-            mTesseract.stopRecognition();
+            if (mSubscription != null && !mSubscription.isUnsubscribed()) {
+                mSubscription.unsubscribe();
+            }
             mTesseract.onDestroy();
         }
     }
@@ -403,7 +428,6 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             return null;
         });
     }
-
 
 
     private void addGoogleDriveImage(Bitmap image, String name, String folderName) {

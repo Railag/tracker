@@ -35,6 +35,8 @@ public class Tesseract {
 
     private boolean available = true;
 
+    private boolean isClosing = false;
+
     public enum Language {
         EN("eng"),
         RU("rus");
@@ -69,16 +71,26 @@ public class Tesseract {
     }
 
     public TessBaseAPI initNewWorker() {
+        if (isClosing) {
+            return null;
+        }
+
         TessBaseAPI worker = new TessBaseAPI();
         String language = this.language.getLocaleTag();
         //    worker.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SPARSE_TEXT);
-        worker.init(datapath, language);//Auto only        mWorkers.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO_ONLY);
-        mWorkers.add(worker);
+        worker.init(datapath, language); //Auto only        mWorkers.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO_ONLY);
+        if (!isClosing) {
+            mWorkers.add(worker);
+        }
         return worker;
     }
 
 
     private TessBaseAPI takeWorker() {
+        if (isClosing) {
+            return null;
+        }
+
         if (mWorkers != null && mWorkers.size() > sCurrentWorker) {
             TessBaseAPI worker = mWorkers.get(sCurrentWorker);
             sCurrentWorker++;
@@ -88,11 +100,11 @@ public class Tesseract {
         }
     }
 
-    public void stopRecognition() {
+/*    public void stopRecognition() {
         for (TessBaseAPI worker : mWorkers) {
             worker.stop();
         }
-    }
+    }*/
 
     public String processImage(Bitmap bitmap) {
         TessBaseAPI worker = takeWorker();
@@ -103,8 +115,10 @@ public class Tesseract {
     }
 
     public void onDestroy() {
+        isClosing = true;
         if (mWorkers != null) {
             for (TessBaseAPI worker : mWorkers) {
+                worker.stop();
                 worker.end();
             }
         }
