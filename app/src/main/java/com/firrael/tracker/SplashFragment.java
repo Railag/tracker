@@ -20,6 +20,10 @@ public class SplashFragment extends SimpleFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         startLoading();
+        if (getMainActivity() == null) {
+            App.setMainActivity((MainActivity) getActivity());
+        }
+
         getMainActivity().transparentStatusBar();
         getMainActivity().hideToolbar();
         getMainActivity().hideFab();

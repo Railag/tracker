@@ -10,11 +10,11 @@ import java.util.List;
 
 class BitmapResults {
     private List<Bitmap> regions;
-    private Bitmap sourceBitmap;
+    private List<Bitmap> sourceBitmaps;
 
-    public BitmapResults(List<Bitmap> regions, Bitmap sourceBitmap) {
+    public BitmapResults(List<Bitmap> regions, List<Bitmap> sourceBitmaps) {
         this.regions = regions;
-        this.sourceBitmap = sourceBitmap;
+        this.sourceBitmaps = sourceBitmaps;
     }
 
     public List<Bitmap> getRegions() {
@@ -25,11 +25,11 @@ class BitmapResults {
         this.regions = regions;
     }
 
-    public Bitmap getSourceBitmap() {
-        return sourceBitmap;
+    public List<Bitmap> getSourceBitmaps() {
+        return sourceBitmaps;
     }
 
-    public void setSourceBitmap(Bitmap sourceBitmap) {
-        this.sourceBitmap = sourceBitmap;
+    public void setSourceBitmaps(List<Bitmap> sourceBitmaps) {
+        this.sourceBitmaps = sourceBitmaps;
     }
 }

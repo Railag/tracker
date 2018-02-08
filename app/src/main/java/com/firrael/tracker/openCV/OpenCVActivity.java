@@ -12,7 +12,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.Toast;
+import android.widget.ImageButton;
 
 import com.firrael.tracker.App;
 import com.firrael.tracker.DriveUtils;
@@ -27,6 +27,7 @@ import com.google.android.gms.drive.DriveResourceClient;
 import com.google.android.gms.drive.MetadataBuffer;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.theartofdev.edmodo.cropper.CropImageView;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
@@ -44,17 +45,16 @@ import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 import rx.Emitter;
 import rx.Observable;
 import rx.android.schedulers.AndroidSchedulers;
-import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.schedulers.Schedulers;
 import rx.subscriptions.CompositeSubscription;
 
+import static org.opencv.android.Utils.bitmapToMat;
 import static org.opencv.android.Utils.matToBitmap;
 
 /**
@@ -69,9 +69,13 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private final static Scalar CONTOUR_COLOR = Scalar.all(100);
 
+
+    private FocusCameraView mOpenCVCameraView;
+    private CropImageView mCropImageView;
+    private ImageButton mCropImageButton;
+
     private Tesseract mTesseract;
     private MSER mDetector;
-    private FocusCameraView mOpenCVCameraView;
     private Mat mGrey, mRgba, mIntermediateMat;
     private DriveResourceClient mDriveResourceClient;
     private int mTesseractCounter;
@@ -126,12 +130,15 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         mDriveResourceClient = App.getDrive();
 
+        mCropImageView = findViewById(R.id.cropImageView);
+        mCropImageButton = findViewById(R.id.cropImageButton);
+
         mOpenCVCameraView = findViewById(R.id.javaCameraView);
         mOpenCVCameraView.setOnLongClickListener(v1 -> {
             if (mTesseract.isAvailable()) {
-                detectTextAsync();
+                detectRegions();
             } else {
-                Toast.makeText(this, "Wait till previous recognition is finished", Toast.LENGTH_SHORT).show();
+                Snackbar.make(mOpenCVCameraView, R.string.recognition_in_progress_error, Snackbar.LENGTH_SHORT).show();
             }
 
             return true;
@@ -170,12 +177,12 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                 .range(0, Tesseract.WORKER_POOL_SIZE)
                 .subscribe(integer -> {
                     Observable<Integer> observable = getInitNewWorkerObservable(integer);
-                    observable.doOnUnsubscribe(new Action0() {
+/*                    observable.doOnUnsubscribe(new Action0() {
                         @Override
                         public void call() {
-
+                            // TODO handle stop
                         }
-                    });
+                    });*/
                     mSubscription.add(observable.subscribeOn(Schedulers.newThread())
                             .observeOn(AndroidSchedulers.mainThread())
                             .subscribe(this::getCreatedObservable, OpenCVActivity.this::onError));
@@ -200,7 +207,6 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         mGrey = inputFrame.gray();
         mRgba = inputFrame.rgba();
-        mIntermediateMat = mGrey;
 
         return mRgba;
     }
@@ -256,8 +262,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mRgba = new Mat(height, width, CvType.CV_8UC4);
     }
 
-    public void detectTextAsync() {
-        BitmapResults bitmapResults = detectRegions();
+    public void processBitmapResults(BitmapResults bitmapResults) {
         List<Bitmap> bitmapRegions = bitmapResults.getRegions();
 
         if (bitmapRegions == null || bitmapRegions.size() == 0) {
@@ -286,7 +291,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         dialog.show();
 
         Observable.create((Action1<Emitter<Void>>) emitter -> {
-            uploadBitmapsToGoogleDrive(regions, bitmapResults.getSourceBitmap());
+            uploadBitmapsToGoogleDrive(regions, bitmapResults.getSourceBitmaps());
             emitter.onCompleted();
         }, Emitter.BackpressureMode.LATEST)
                 .subscribeOn(Schedulers.newThread())
@@ -334,89 +339,123 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         finish();
     }
 
-    private BitmapResults detectRegions() {
-        MatOfKeyPoint keypoint = new MatOfKeyPoint();
-        List<KeyPoint> listpoint;
-        KeyPoint kpoint;
-        Mat mask = Mat.zeros(mGrey.size(), CvType.CV_8UC1);
-        int rectanx1;
-        int rectany1;
-        int rectanx2;
-        int rectany2;
-        int imgsize = mGrey.height() * mGrey.width();
-        Scalar zeros = new Scalar(0, 0, 0);
+    private void detectRegions() {
+        Bitmap source = Bitmap.createBitmap(mGrey.width(), mGrey.height(), Bitmap.Config.ARGB_8888);
+        matToBitmap(mGrey, source);
 
-        List<MatOfPoint> contour2 = new ArrayList<>();
-        Mat kernel = new Mat(1, 50, CvType.CV_8UC1, Scalar.all(255));
-        Mat morbyte = new Mat();
-        Mat hierarchy = new Mat();
+        // crop image
+        mCropImageButton.setVisibility(View.VISIBLE);
+        mCropImageButton.setOnClickListener(v -> {
+            List<Bitmap> sourceImages = new ArrayList<>();
+            sourceImages.add(source); // full image source
 
-        Rect rectan3;
-        //
+            Bitmap croppedBitmap = mCropImageView.getCroppedImage();
+            Mat croppedMat = new Mat();
+            bitmapToMat(croppedBitmap, croppedMat);
+            Imgproc.cvtColor(croppedMat, croppedMat, Imgproc.COLOR_BGR2GRAY); // convert bitmap back to grayscale mat
 
-        if (mDetector == null) {
-            initDetector();
-        }
 
-        mDetector.detect(mGrey, keypoint);
-        listpoint = keypoint.toList();
+            mIntermediateMat = croppedMat;
 
-        for (int i = 0; i < listpoint.size(); i++) {
-            kpoint = listpoint.get(i);
-            rectanx1 = (int) (kpoint.pt.x - 0.5 * kpoint.size);
-            rectany1 = (int) (kpoint.pt.y - 0.5 * kpoint.size);
-            rectanx2 = (int) (kpoint.size);
-            rectany2 = (int) (kpoint.size);
-            if (rectanx1 <= 0)
-                rectanx1 = 1;
-            if (rectany1 <= 0)
-                rectany1 = 1;
-            if ((rectanx1 + rectanx2) > mGrey.width())
-                rectanx2 = mGrey.width() - rectanx1;
-            if ((rectany1 + rectany2) > mGrey.height())
-                rectany2 = mGrey.height() - rectany1;
-            Rect rectant = new Rect(rectanx1, rectany1, rectanx2, rectany2);
-            try {
-                Mat roi = new Mat(mask, rectant);
-                roi.setTo(CONTOUR_COLOR);
-            } catch (Exception ex) {
-                Log.d(TAG, "mat roi error " + ex.getMessage());
+            MatOfKeyPoint keypoint = new MatOfKeyPoint();
+            List<KeyPoint> listpoint;
+            KeyPoint kpoint;
+            Mat mask = Mat.zeros(croppedMat.size(), CvType.CV_8UC1);
+            int rectanx1;
+            int rectany1;
+            int rectanx2;
+            int rectany2;
+
+            List<MatOfPoint> contour2 = new ArrayList<>();
+            Mat kernel = new Mat(1, 50, CvType.CV_8UC1, Scalar.all(255));
+            Mat morbyte = new Mat();
+            Mat hierarchy = new Mat();
+
+            Rect rectan3;
+            //
+
+            if (mDetector == null) {
+                initDetector();
             }
-        }
 
-        Imgproc.morphologyEx(mask, morbyte, Imgproc.MORPH_DILATE, kernel); // dilate filter
+            mDetector.detect(croppedMat, keypoint);
+            listpoint = keypoint.toList();
 
-        Imgproc.findContours(morbyte, contour2, hierarchy,
-                Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
-
-        Collections.reverse(contour2);
-
-        List<Bitmap> bitmapsToRecognize = new ArrayList<>();
-
-        for (int ind = 0; ind < contour2.size(); ind++) {
-            rectan3 = Imgproc.boundingRect(contour2.get(ind));
-            Imgproc.rectangle(mGrey, rectan3.br(), rectan3.tl(),
-                    CONTOUR_COLOR);
-            Bitmap bmp = null;
-            try {
-                Mat croppedPart;
-                croppedPart = mIntermediateMat.submat(rectan3); // gain mat from rectan3?
-                bmp = Bitmap.createBitmap(croppedPart.width(), croppedPart.height(), Bitmap.Config.ARGB_8888);
-                matToBitmap(croppedPart, bmp);
-            } catch (Exception e) {
-                Log.d(TAG, "cropped part data error " + e.getMessage());
+            for (int i = 0; i < listpoint.size(); i++) {
+                kpoint = listpoint.get(i);
+                rectanx1 = (int) (kpoint.pt.x - 0.5 * kpoint.size);
+                rectany1 = (int) (kpoint.pt.y - 0.5 * kpoint.size);
+                rectanx2 = (int) (kpoint.size);
+                rectany2 = (int) (kpoint.size);
+                if (rectanx1 <= 0)
+                    rectanx1 = 1;
+                if (rectany1 <= 0)
+                    rectany1 = 1;
+                if ((rectanx1 + rectanx2) > croppedMat.width())
+                    rectanx2 = croppedMat.width() - rectanx1;
+                if ((rectany1 + rectany2) > croppedMat.height())
+                    rectany2 = croppedMat.height() - rectany1;
+                Rect rectant = new Rect(rectanx1, rectany1, rectanx2, rectany2);
+                try {
+                    Mat roi = new Mat(mask, rectant);
+                    roi.setTo(CONTOUR_COLOR);
+                } catch (Exception ex) {
+                    Log.d(TAG, "mat roi error " + ex.getMessage());
+                }
             }
-            if (bmp != null) {
-                bitmapsToRecognize.add(bmp);
+
+            Bitmap sourceMask = Bitmap.createBitmap(mask.width(), mask.height(), Bitmap.Config.ARGB_8888);
+            matToBitmap(mask, sourceMask);
+            sourceImages.add(sourceMask); // mask before dilation filter, but with detected contours
+
+            Imgproc.morphologyEx(mask, morbyte, Imgproc.MORPH_DILATE, kernel); // dilate filter
+
+            Bitmap sourceImage = Bitmap.createBitmap(morbyte.width(), morbyte.height(), Bitmap.Config.ARGB_8888);
+            matToBitmap(morbyte, sourceImage);
+            sourceImages.add(sourceImage); // mask after dilation filter
+
+            Imgproc.findContours(morbyte, contour2, hierarchy,
+                    Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
+
+            Collections.reverse(contour2);
+
+            List<Bitmap> bitmapsToRecognize = new ArrayList<>();
+
+            for (int ind = 0; ind < contour2.size(); ind++) {
+                rectan3 = Imgproc.boundingRect(contour2.get(ind));
+                Imgproc.rectangle(croppedMat, rectan3.br(), rectan3.tl(),
+                        CONTOUR_COLOR);
+                Bitmap bmp = null;
+                try {
+                    Mat croppedPart;
+                    croppedPart = mIntermediateMat.submat(rectan3);
+                    bmp = Bitmap.createBitmap(croppedPart.width(), croppedPart.height(), Bitmap.Config.ARGB_8888);
+                    matToBitmap(croppedPart, bmp);
+                } catch (Exception e) {
+                    Log.d(TAG, "cropped part data error " + e.getMessage());
+                }
+                if (bmp != null) {
+                    bitmapsToRecognize.add(bmp);
+                }
             }
+
+            Bitmap sourceCropped = Bitmap.createBitmap(croppedMat.width(), croppedMat.height(), Bitmap.Config.ARGB_8888);
+            matToBitmap(croppedMat, sourceImage);
+            sourceImages.add(sourceCropped);
+
+            BitmapResults results = new BitmapResults(bitmapsToRecognize, sourceImages);
+
+            processBitmapResults(results);
+        });
+
+        mCropImageView.setVisibility(View.VISIBLE);
+        mCropImageView.setImageBitmap(source);
+        mCropImageView.setAutoZoomEnabled(true);
+        mCropImageView.setGuidelines(CropImageView.Guidelines.ON);
+
+        if (mOpenCVCameraView != null) {
+            mOpenCVCameraView.disableView();
         }
-
-        Bitmap sourceImage = Bitmap.createBitmap(mGrey.width(), mGrey.height(), Bitmap.Config.ARGB_8888);
-        matToBitmap(mGrey, sourceImage);
-
-        BitmapResults results = new BitmapResults(bitmapsToRecognize, sourceImage);
-
-        return results;
     }
 
     @Override
@@ -424,7 +463,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         Log.i(TAG, "onCameraViewStopped called");
     }
 
-    public void uploadBitmapsToGoogleDrive(List<BitmapRegion> regions, Bitmap sourceBitmap) {
+    public void uploadBitmapsToGoogleDrive(List<BitmapRegion> regions, List<Bitmap> sourceBitmaps) {
         String timeStamp = Utils.getCurrentTimestamp();
         final String folderName = timeStamp + " openCV";
 
@@ -437,7 +476,11 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                 addGoogleDriveImage(region.getBitmap(), "region #" + region.getRegionNumber(), folderName);
             }
 
-            addGoogleDriveImage(sourceBitmap, "source image", folderName);
+            if (sourceBitmaps != null && sourceBitmaps.size() > 0) {
+                for (int i = 0; i < sourceBitmaps.size(); i++) {
+                    addGoogleDriveImage(sourceBitmaps.get(i), "source image " + i, folderName);
+                }
+            }
 
             return null;
         });

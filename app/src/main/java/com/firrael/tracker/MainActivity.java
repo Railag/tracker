@@ -181,11 +181,15 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void showToolbar() {
-        toolbar.setVisibility(View.VISIBLE);
+        if (toolbar != null) {
+            toolbar.setVisibility(View.VISIBLE);
+        }
     }
 
     public void hideToolbar() {
-        toolbar.setVisibility(View.GONE);
+        if (toolbar != null) {
+            toolbar.setVisibility(View.GONE);
+        }
     }
 
     public void transparentStatusBar() {

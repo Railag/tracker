@@ -39,4 +39,5 @@
     <string name="select_language_for_opencv_recognition">Select language for OpenCV recognition.</string>
     <string name="google_drive_login_message">You need to log in using Google Drive in order to use application.</string>
     <string name="sharing_message">Select app for sharing</string>
+    <string name="recognition_in_progress_error">Wait till previous recognition is finished</string>
 </resources>

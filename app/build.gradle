@@ -81,6 +81,8 @@ dependencies {
 
     implementation 'com.rmtheis:tess-two:7.0.0' // works only with 7.0.0 version
 
+    implementation 'com.theartofdev.edmodo:android-image-cropper:2.6.0'
+
     implementation 'com.github.bumptech.glide:glide:4.5.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.5.0'
 
