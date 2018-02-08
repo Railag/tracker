@@ -15,10 +15,23 @@
         android:visibility="gone" />
 
     <ImageButton
-        android:id="@+id/cropImageButton"
+        android:id="@+id/cropImageAcceptButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="16dp"
         android:visibility="gone"
         app:srcCompat="@drawable/ic_done_black_24dp" />
+
+    <ImageButton
+        android:id="@+id/cropImageBackButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="16dp"
+        android:layout_toEndOf="@id/cropImageAcceptButton"
+        android:visibility="gone"
+        app:srcCompat="@drawable/ic_close_black_24dp" />
 </RelativeLayout>

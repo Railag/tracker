@@ -42,6 +42,13 @@ public class FocusCameraView extends JavaCameraView {
         String previewSize = params.get("preview-size");
         Log.i(TAG, "Preview size: " + previewSize);
         //params.setPreviewSize(PREVIEW_WIDTH, PREVIEW_HEIGHT);
+
+        params.setFlashMode(Camera.Parameters.FLASH_MODE_AUTO);
+    }
+
+    public void switchFlashMode(String mode) {
+        Camera.Parameters params = mCamera.getParameters();
+        params.setFlashMode(mode);
     }
 
     @Override

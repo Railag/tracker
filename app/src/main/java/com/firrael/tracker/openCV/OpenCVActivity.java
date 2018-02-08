@@ -68,11 +68,13 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     public final static String KEY_SCAN_RESULTS = "scanResults";
 
     private final static Scalar CONTOUR_COLOR = Scalar.all(100);
+    private static final int KERNEL_POWER = 50; // increase to make regions larger, decrease to make regions smaller
 
 
     private FocusCameraView mOpenCVCameraView;
     private CropImageView mCropImageView;
-    private ImageButton mCropImageButton;
+    private ImageButton mCropAcceptButton;
+    private ImageButton mCropBackButton;
 
     private Tesseract mTesseract;
     private MSER mDetector;
@@ -131,7 +133,11 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mDriveResourceClient = App.getDrive();
 
         mCropImageView = findViewById(R.id.cropImageView);
-        mCropImageButton = findViewById(R.id.cropImageButton);
+        mCropImageView.setAutoZoomEnabled(true);
+        mCropImageView.setGuidelines(CropImageView.Guidelines.ON);
+
+        mCropAcceptButton = findViewById(R.id.cropImageAcceptButton);
+        mCropBackButton = findViewById(R.id.cropImageBackButton);
 
         mOpenCVCameraView = findViewById(R.id.javaCameraView);
         mOpenCVCameraView.setOnLongClickListener(v1 -> {
@@ -344,8 +350,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         matToBitmap(mGrey, source);
 
         // crop image
-        mCropImageButton.setVisibility(View.VISIBLE);
-        mCropImageButton.setOnClickListener(v -> {
+        mCropAcceptButton.setVisibility(View.VISIBLE);
+        mCropAcceptButton.setOnClickListener(v -> {
             List<Bitmap> sourceImages = new ArrayList<>();
             sourceImages.add(source); // full image source
 
@@ -366,8 +372,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             int rectanx2;
             int rectany2;
 
-            List<MatOfPoint> contour2 = new ArrayList<>();
-            Mat kernel = new Mat(1, 50, CvType.CV_8UC1, Scalar.all(255));
+            List<MatOfPoint> contours = new ArrayList<>();
+            Mat kernel = new Mat(1, KERNEL_POWER, CvType.CV_8UC1, Scalar.all(255)); // KERNEL_POWER = region width
             Mat morbyte = new Mat();
             Mat hierarchy = new Mat();
 
@@ -414,15 +420,15 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             matToBitmap(morbyte, sourceImage);
             sourceImages.add(sourceImage); // mask after dilation filter
 
-            Imgproc.findContours(morbyte, contour2, hierarchy,
+            Imgproc.findContours(morbyte, contours, hierarchy,
                     Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
 
-            Collections.reverse(contour2);
+            Collections.reverse(contours);
 
             List<Bitmap> bitmapsToRecognize = new ArrayList<>();
 
-            for (int ind = 0; ind < contour2.size(); ind++) {
-                rectan3 = Imgproc.boundingRect(contour2.get(ind));
+            for (int ind = 0; ind < contours.size(); ind++) {
+                rectan3 = Imgproc.boundingRect(contours.get(ind));
                 Imgproc.rectangle(croppedMat, rectan3.br(), rectan3.tl(),
                         CONTOUR_COLOR);
                 Bitmap bmp = null;
@@ -448,14 +454,24 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             processBitmapResults(results);
         });
 
+        mCropBackButton.setVisibility(View.VISIBLE);
+        mCropBackButton.setOnClickListener(v -> {
+            reset();
+        });
+
         mCropImageView.setVisibility(View.VISIBLE);
         mCropImageView.setImageBitmap(source);
-        mCropImageView.setAutoZoomEnabled(true);
-        mCropImageView.setGuidelines(CropImageView.Guidelines.ON);
 
         if (mOpenCVCameraView != null) {
             mOpenCVCameraView.disableView();
         }
+    }
+
+    private void reset() {
+        mCropImageView.setVisibility(View.GONE);
+        mCropAcceptButton.setVisibility(View.GONE);
+        mCropBackButton.setVisibility(View.GONE);
+        mOpenCVCameraView.enableView();
     }
 
     @Override
