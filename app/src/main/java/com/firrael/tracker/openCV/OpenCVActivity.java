@@ -33,13 +33,18 @@ import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.KeyPoint;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.MatOfPoint;
+import org.opencv.core.MatOfPoint2f;
+import org.opencv.core.Point;
 import org.opencv.core.Rect;
+import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
+import org.opencv.core.Size;
 import org.opencv.features2d.MSER;
 import org.opencv.imgproc.Imgproc;
 
@@ -56,6 +61,8 @@ import rx.subscriptions.CompositeSubscription;
 
 import static org.opencv.android.Utils.bitmapToMat;
 import static org.opencv.android.Utils.matToBitmap;
+import static org.opencv.imgproc.Imgproc.ADAPTIVE_THRESH_MEAN_C;
+import static org.opencv.imgproc.Imgproc.THRESH_BINARY;
 
 /**
  * Created by railag on 04.01.2018.
@@ -346,8 +353,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     private void detectRegions() {
-        Bitmap source = Bitmap.createBitmap(mGrey.width(), mGrey.height(), Bitmap.Config.ARGB_8888);
-        matToBitmap(mGrey, source);
+        Bitmap source = textSkew(mGrey);
 
         // crop image
         mCropAcceptButton.setVisibility(View.VISIBLE);
@@ -465,6 +471,96 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         if (mOpenCVCameraView != null) {
             mOpenCVCameraView.disableView();
         }
+    }
+
+    private Bitmap textSkew(Mat greyscale) {
+        List<Bitmap> sourceImages = new ArrayList<>();
+
+        Bitmap sourceImage = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
+        matToBitmap(greyscale, sourceImage);
+        sourceImages.add(sourceImage);
+
+        Mat source = greyscale.clone();
+
+        //Binarize it
+        //Use adaptive threshold if necessary
+        Imgproc.adaptiveThreshold(greyscale, greyscale, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
+        //Imgproc.threshold(greyscale, greyscale, 200, 255, Imgproc.THRESH_BINARY);
+
+        Bitmap sourceThreshold = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
+        matToBitmap(greyscale, sourceThreshold);
+        sourceImages.add(sourceThreshold);
+
+        //Invert the colors (because objects are represented as white pixels, and the background is represented by black pixels)
+        Core.bitwise_not(greyscale, greyscale);
+        Mat element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(3, 3));
+
+        Bitmap sourceElement = Bitmap.createBitmap(element.width(), element.height(), Bitmap.Config.ARGB_8888);
+        matToBitmap(element, sourceElement);
+        sourceImages.add(sourceElement);
+
+        //We can now perform our erosion, we must declare our rectangle-shaped structuring element and call the erode function
+        Imgproc.erode(greyscale, greyscale, element);
+
+        Bitmap sourceErodedGreyscale = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
+        matToBitmap(greyscale, sourceErodedGreyscale);
+        sourceImages.add(sourceErodedGreyscale);
+
+        //Find all white pixels
+        Mat wLocMat = Mat.zeros(greyscale.size(), greyscale.type());
+        Core.findNonZero(greyscale, wLocMat);
+
+        Bitmap sourceLockMat = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
+        matToBitmap(greyscale, sourceLockMat);
+        sourceImages.add(sourceLockMat);
+
+        //Create an empty Mat and pass it to the function
+        MatOfPoint matOfPoint = new MatOfPoint(wLocMat);
+
+        //Translate MatOfPoint to MatOfPoint2f in order to user at a next step
+        MatOfPoint2f mat2f = new MatOfPoint2f();
+        matOfPoint.convertTo(mat2f, CvType.CV_32FC2);
+
+        //Get rotated rect of white pixels
+        RotatedRect rotatedRect = Imgproc.minAreaRect(mat2f);
+
+        Point[] vertices = new Point[4];
+        rotatedRect.points(vertices);
+        List<MatOfPoint> boxContours = new ArrayList<>();
+        boxContours.add(new MatOfPoint(vertices));
+        Imgproc.drawContours(greyscale, boxContours, 0, new Scalar(128, 128, 128), -1);
+
+        Bitmap sourceGreyscale = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
+        matToBitmap(greyscale, sourceGreyscale);
+        sourceImages.add(sourceGreyscale);
+
+        double resultAngle = rotatedRect.angle;
+        resultAngle += 90.f; // for landscape mode
+        if (rotatedRect.size.width > rotatedRect.size.height) {
+            rotatedRect.angle += 90.f;
+        }
+
+        //Or
+        //rotatedRect.angle = rotatedRect.angle < -45 ? rotatedRect.angle + 90.f : rotatedRect.angle;
+
+        Mat result = deskew(source, resultAngle);
+
+        Bitmap bitmap = Bitmap.createBitmap(result.width(), result.height(), Bitmap.Config.ARGB_8888);
+        matToBitmap(result, bitmap);
+        sourceImages.add(bitmap);
+
+        uploadBitmapsToGoogleDrive(new ArrayList<>(), sourceImages);
+
+        return bitmap;
+    }
+
+    public Mat deskew(Mat src, double angle) {
+        Point center = new Point(src.width() / 2, src.height() / 2);
+        Mat rotImage = Imgproc.getRotationMatrix2D(center, angle, 1.0);
+        //1.0 means 100 % scale
+        Size size = new Size(src.width(), src.height());
+        Imgproc.warpAffine(src, src, rotImage, size, Imgproc.INTER_LINEAR + Imgproc.CV_WARP_FILL_OUTLIERS);
+        return src;
     }
 
     private void reset() {
