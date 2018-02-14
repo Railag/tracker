@@ -82,6 +82,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private CropImageView mCropImageView;
     private ImageButton mCropAcceptButton;
     private ImageButton mCropBackButton;
+    private ImageButton mCropRotateButton;
 
     private Tesseract mTesseract;
     private MSER mDetector;
@@ -145,6 +146,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         mCropAcceptButton = findViewById(R.id.cropImageAcceptButton);
         mCropBackButton = findViewById(R.id.cropImageBackButton);
+        mCropRotateButton = findViewById(R.id.cropImageRotateButton);
 
         mOpenCVCameraView = findViewById(R.id.javaCameraView);
         mOpenCVCameraView.setOnLongClickListener(v1 -> {
@@ -461,9 +463,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         });
 
         mCropBackButton.setVisibility(View.VISIBLE);
-        mCropBackButton.setOnClickListener(v -> {
-            reset();
-        });
+        mCropBackButton.setOnClickListener(v -> reset());
+
+        mCropRotateButton.setVisibility(View.VISIBLE);
+        mCropRotateButton.setOnClickListener(v -> mCropImageView.rotateImage(90));
 
         mCropImageView.setVisibility(View.VISIBLE);
         mCropImageView.setImageBitmap(source);
@@ -521,37 +524,42 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         MatOfPoint2f mat2f = new MatOfPoint2f();
         matOfPoint.convertTo(mat2f, CvType.CV_32FC2);
 
-        //Get rotated rect of white pixels
-        RotatedRect rotatedRect = Imgproc.minAreaRect(mat2f);
+        try {
+            //Get rotated rect of white pixels
+            RotatedRect rotatedRect = Imgproc.minAreaRect(mat2f);
 
-        Point[] vertices = new Point[4];
-        rotatedRect.points(vertices);
-        List<MatOfPoint> boxContours = new ArrayList<>();
-        boxContours.add(new MatOfPoint(vertices));
-        Imgproc.drawContours(greyscale, boxContours, 0, new Scalar(128, 128, 128), -1);
+            Point[] vertices = new Point[4];
+            rotatedRect.points(vertices);
+            List<MatOfPoint> boxContours = new ArrayList<>();
+            boxContours.add(new MatOfPoint(vertices));
+            Imgproc.drawContours(greyscale, boxContours, 0, new Scalar(128, 128, 128), -1);
 
-        Bitmap sourceGreyscale = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
-        matToBitmap(greyscale, sourceGreyscale);
-        sourceImages.add(sourceGreyscale);
+            Bitmap sourceGreyscale = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
+            matToBitmap(greyscale, sourceGreyscale);
+            sourceImages.add(sourceGreyscale);
 
-        double resultAngle = rotatedRect.angle;
-        resultAngle += 90.f; // for landscape mode
-        if (rotatedRect.size.width > rotatedRect.size.height) {
-            rotatedRect.angle += 90.f;
+            double resultAngle = rotatedRect.angle;
+            resultAngle += 90.f; // for landscape mode
+            if (rotatedRect.size.width > rotatedRect.size.height) {
+                rotatedRect.angle += 90.f;
+            }
+
+            //Or
+            //rotatedRect.angle = rotatedRect.angle < -45 ? rotatedRect.angle + 90.f : rotatedRect.angle;
+
+            Mat result = deskew(source, resultAngle);
+
+            Bitmap bitmap = Bitmap.createBitmap(result.width(), result.height(), Bitmap.Config.ARGB_8888);
+            matToBitmap(result, bitmap);
+            sourceImages.add(bitmap);
+
+            uploadBitmapsToGoogleDrive(new ArrayList<>(), sourceImages);
+
+            return bitmap;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return sourceImage;
         }
-
-        //Or
-        //rotatedRect.angle = rotatedRect.angle < -45 ? rotatedRect.angle + 90.f : rotatedRect.angle;
-
-        Mat result = deskew(source, resultAngle);
-
-        Bitmap bitmap = Bitmap.createBitmap(result.width(), result.height(), Bitmap.Config.ARGB_8888);
-        matToBitmap(result, bitmap);
-        sourceImages.add(bitmap);
-
-        uploadBitmapsToGoogleDrive(new ArrayList<>(), sourceImages);
-
-        return bitmap;
     }
 
     public Mat deskew(Mat src, double angle) {
@@ -567,6 +575,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mCropImageView.setVisibility(View.GONE);
         mCropAcceptButton.setVisibility(View.GONE);
         mCropBackButton.setVisibility(View.GONE);
+        mCropRotateButton.setVisibility(View.GONE);
         mOpenCVCameraView.enableView();
     }
 

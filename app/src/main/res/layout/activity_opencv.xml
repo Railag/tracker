@@ -34,4 +34,16 @@
         android:layout_toEndOf="@id/cropImageAcceptButton"
         android:visibility="gone"
         app:srcCompat="@drawable/ic_close_black_24dp" />
+
+    <ImageButton
+        android:id="@+id/cropImageRotateButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="16dp"
+        android:layout_marginEnd="8dp"
+        android:layout_toEndOf="@id/cropImageBackButton"
+        android:visibility="gone"
+        app:srcCompat="@drawable/ic_rotate_90_degrees_ccw_black_24dp" />
 </RelativeLayout>
