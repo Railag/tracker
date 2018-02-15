@@ -46,4 +46,16 @@
         android:layout_toEndOf="@id/cropImageBackButton"
         android:visibility="gone"
         app:srcCompat="@drawable/ic_rotate_90_degrees_ccw_black_24dp" />
+
+    <ImageButton
+        android:id="@+id/cropImageSkewButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="16dp"
+        android:layout_marginEnd="8dp"
+        android:layout_toEndOf="@id/cropImageRotateButton"
+        android:visibility="gone"
+        app:srcCompat="@drawable/ic_format_textdirection_l_to_r_black_24dp" />
 </RelativeLayout>

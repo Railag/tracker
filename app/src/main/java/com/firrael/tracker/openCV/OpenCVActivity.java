@@ -77,12 +77,12 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private final static Scalar CONTOUR_COLOR = Scalar.all(100);
     private static final int KERNEL_POWER = 50; // increase to make regions larger, decrease to make regions smaller
 
-
     private FocusCameraView mOpenCVCameraView;
     private CropImageView mCropImageView;
     private ImageButton mCropAcceptButton;
     private ImageButton mCropBackButton;
     private ImageButton mCropRotateButton;
+    private ImageButton mCropSkewButton;
 
     private Tesseract mTesseract;
     private MSER mDetector;
@@ -91,6 +91,9 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private int mTesseractCounter;
     private Tesseract.Language mLanguage;
     private CompositeSubscription mSubscription;
+    private int mUploadedCounter = 0;
+    private int mMaxUploaded = -1;
+    private boolean mIsUploaded, mIsRecognized;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -147,6 +150,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mCropAcceptButton = findViewById(R.id.cropImageAcceptButton);
         mCropBackButton = findViewById(R.id.cropImageBackButton);
         mCropRotateButton = findViewById(R.id.cropImageRotateButton);
+        mCropSkewButton = findViewById(R.id.cropImageSkewButton);
 
         mOpenCVCameraView = findViewById(R.id.javaCameraView);
         mOpenCVCameraView.setOnLongClickListener(v1 -> {
@@ -305,7 +309,9 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         dialog.setProgress(0);
         dialog.show();
 
+        mUploadedCounter = 0;
         Observable.create((Action1<Emitter<Void>>) emitter -> {
+            mMaxUploaded = regions.size() + bitmapResults.getSourceBitmaps().size();
             uploadBitmapsToGoogleDrive(regions, bitmapResults.getSourceBitmaps());
             emitter.onCompleted();
         }, Emitter.BackpressureMode.LATEST)
@@ -351,11 +357,16 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         ArrayList<RecognizedRegion> results = new ArrayList<>(s);
         data.putParcelableArrayListExtra(KEY_SCAN_RESULTS, results);
         setResult(RESULT_OK, data);
-        finish();
+        mIsRecognized = true;
+        if (mIsUploaded) {
+            finish();
+        }
     }
 
     private void detectRegions() {
-        Bitmap source = textSkew(mGrey);
+        ///    Bitmap source = textSkew(mGrey);
+        Bitmap source = Bitmap.createBitmap(mGrey.width(), mGrey.height(), Bitmap.Config.ARGB_8888);
+        matToBitmap(mGrey, source);
 
         // crop image
         mCropAcceptButton.setVisibility(View.VISIBLE);
@@ -468,6 +479,17 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mCropRotateButton.setVisibility(View.VISIBLE);
         mCropRotateButton.setOnClickListener(v -> mCropImageView.rotateImage(90));
 
+        mCropSkewButton.setVisibility(View.VISIBLE);
+        mCropSkewButton.setOnClickListener(v -> {
+            Bitmap croppedBitmap = mCropImageView.getCroppedImage();
+            Mat croppedMat = new Mat();
+            bitmapToMat(croppedBitmap, croppedMat);
+            Imgproc.cvtColor(croppedMat, croppedMat, Imgproc.COLOR_BGR2GRAY);
+
+            Bitmap skewedBitmap = textSkew(croppedMat);
+            mCropImageView.setImageBitmap(skewedBitmap);
+        });
+
         mCropImageView.setVisibility(View.VISIBLE);
         mCropImageView.setImageBitmap(source);
 
@@ -576,6 +598,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mCropAcceptButton.setVisibility(View.GONE);
         mCropBackButton.setVisibility(View.GONE);
         mCropRotateButton.setVisibility(View.GONE);
+        mCropSkewButton.setVisibility(View.GONE);
         mOpenCVCameraView.enableView();
     }
 
@@ -623,9 +646,25 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             return DriveUtils.createImage(contents, image, name, folder, mDriveResourceClient);
         })
                 .addOnSuccessListener(this,
-                        driveFile -> Log.i(TAG, "Upload finished " + name))
+                        driveFile -> verifyUpload(name))
                 .addOnFailureListener(this, e -> {
                     Log.e(TAG, "Unable to create file", e);
                 });
+    }
+
+    private void verifyUpload(String name) {
+        Log.i(TAG, "Upload finished " + name);
+
+        mUploadedCounter++;
+
+        if (mUploadedCounter >= mMaxUploaded) {
+            mIsUploaded = true;
+            if (mIsRecognized) {
+                finish();
+            }
+
+            mUploadedCounter = 0;
+            mMaxUploaded = -1;
+        }
     }
 }
