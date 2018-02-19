@@ -112,16 +112,13 @@ public class FocusCameraView extends JavaCameraView {
         int realHeight = displayMetrics.heightPixels; // 1080
 
         // 1903/1920, 14/1080.
-        //     /1000,   /1000.
+        // x /1000,   y/1000.
         int adjustedWidth = (int) (x * 1000 / realWidth);
         int adjustedHeight = (int) (y * 1000 / realHeight);
 
-        float focusAreaValue = 72; // TODO update?
+        float focusAreaValue = 72;
         int focusAreaSize = Float.valueOf(focusAreaValue * coefficient).intValue();
-/*
-        int left = clamp(adjustedWidth - focusAreaSize / 2, 0, getWidth() - focusAreaSize);
-        int top = clamp(adjustedHeight - focusAreaSize / 2, 0, getHeight() - focusAreaSize);
-*/
+
         RectF rectF = new RectF(adjustedWidth, adjustedHeight, adjustedWidth + focusAreaSize, adjustedHeight + focusAreaSize);
         getMatrix().mapRect(rectF);
 
@@ -131,7 +128,6 @@ public class FocusCameraView extends JavaCameraView {
         final int b = clamp(Math.round(rectF.bottom), -1000, 1000);
 
         return new android.graphics.Rect(l, t, r, b);
-        //    return new android.graphics.Rect((int) rectF.left, (int) rectF.top, (int) rectF.right, (int) rectF.bottom);
     }
 
     private int clamp(int x, int min, int max) {
