@@ -40,4 +40,7 @@
     <string name="google_drive_login_message">You need to log in using Google Drive in order to use application.</string>
     <string name="sharing_message">Select app for sharing</string>
     <string name="recognition_in_progress_error">Wait till previous recognition is finished</string>
+    <string name="results">Results</string>
+    <string name="reset_image">Reset image</string>
+    <string name="take_another_image">Take Another Image</string>
 </resources>

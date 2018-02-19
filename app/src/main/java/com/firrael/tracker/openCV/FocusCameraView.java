@@ -22,9 +22,6 @@ import java.util.List;
 public class FocusCameraView extends JavaCameraView {
     private final static String TAG = FocusCameraView.class.getSimpleName();
 
-    private final static int PREVIEW_WIDTH = 800;
-    private final static int PREVIEW_HEIGHT = 600;
-
     public final static int FOCUS_AUTO = 0;
     public final static int FOCUS_CONTINUOUS_VIDEO = 1;
     public final static int FOCUS_EDOF = 2;
@@ -90,6 +87,7 @@ public class FocusCameraView extends JavaCameraView {
                 parameters.setMeteringAreas(meteringAreas);
             }
 
+            parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
             mCamera.setParameters(parameters);
             mCamera.autoFocus((b, camera) -> {
             });

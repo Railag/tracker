@@ -1,5 +1,6 @@
 package com.firrael.tracker.openCV;
 
+import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -91,9 +92,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private int mTesseractCounter;
     private Tesseract.Language mLanguage;
     private CompositeSubscription mSubscription;
-    private int mUploadedCounter = 0;
-    private int mMaxUploaded = -1;
-    private boolean mIsUploaded, mIsRecognized;
+    private Bitmap savedSource;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -155,7 +154,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mOpenCVCameraView = findViewById(R.id.javaCameraView);
         mOpenCVCameraView.setOnLongClickListener(v1 -> {
             if (mTesseract.isAvailable()) {
-                detectRegions();
+                detectRegions(true);
             } else {
                 Snackbar.make(mOpenCVCameraView, R.string.recognition_in_progress_error, Snackbar.LENGTH_SHORT).show();
             }
@@ -309,9 +308,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         dialog.setProgress(0);
         dialog.show();
 
-        mUploadedCounter = 0;
         Observable.create((Action1<Emitter<Void>>) emitter -> {
-            mMaxUploaded = regions.size() + bitmapResults.getSourceBitmaps().size();
             uploadBitmapsToGoogleDrive(regions, bitmapResults.getSourceBitmaps());
             emitter.onCompleted();
         }, Emitter.BackpressureMode.LATEST)
@@ -357,27 +354,62 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         ArrayList<RecognizedRegion> results = new ArrayList<>(s);
         data.putParcelableArrayListExtra(KEY_SCAN_RESULTS, results);
         setResult(RESULT_OK, data);
-        mIsRecognized = true;
-        if (mIsUploaded) {
-            finish();
-        }
+        showResults(results);
     }
 
-    private void detectRegions() {
+    private void showResults(ArrayList<RecognizedRegion> results) {
+
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < results.size(); i++) {
+            RecognizedRegion line = results.get(i);
+            builder.append("region#");
+            builder.append(line.getRegionNumber());
+            builder.append(": ");
+            builder.append(line);
+            builder.append("\n");
+        }
+
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.results)
+                .setMessage(builder.toString())
+                .setPositiveButton(R.string.done, (dialog13, which) -> {
+                    dialog13.dismiss();
+                    finish();
+                })
+                .setNeutralButton(R.string.reset_image, (dialog12, which) -> {
+                    dialog12.dismiss();
+                    resetToSourceImage();
+                })
+                .setNegativeButton(R.string.take_another_image, (dialog1, which) -> {
+                    dialog1.dismiss();
+                    resetToInitial();
+                })
+                .create();
+        dialog.show();
+    }
+
+    private void resetToSourceImage() {
+        detectRegions(false);
+    }
+
+    private void detectRegions(boolean initial) {
         ///    Bitmap source = textSkew(mGrey);
-        Bitmap source = Bitmap.createBitmap(mGrey.width(), mGrey.height(), Bitmap.Config.ARGB_8888);
+        if (initial) {
+            savedSource = Bitmap.createBitmap(mGrey.width(), mGrey.height(), Bitmap.Config.ARGB_8888);
 //        matToBitmap(mGrey, source);
 
 
-        Mat tmp = imagePostProcessing(mGrey.clone());
-        matToBitmap(tmp, source);
+            Mat tmp = imagePostProcessing(mGrey.clone());
+            matToBitmap(tmp, savedSource);
+        }
         // TODO PERFECT TEST Bitmap source = BitmapFactory.decodeResource(getResources(), R.drawable.test_ocr_image);
 
         // crop image
         mCropAcceptButton.setVisibility(View.VISIBLE);
         mCropAcceptButton.setOnClickListener(v -> {
             List<Bitmap> sourceImages = new ArrayList<>();
-            sourceImages.add(source); // full image source
+            sourceImages.add(savedSource); // full image source
 
             Bitmap croppedBitmap = mCropImageView.getCroppedImage();
             Mat croppedMat = new Mat();
@@ -478,7 +510,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         });
 
         mCropBackButton.setVisibility(View.VISIBLE);
-        mCropBackButton.setOnClickListener(v -> reset());
+        mCropBackButton.setOnClickListener(v -> resetToInitial());
 
         mCropRotateButton.setVisibility(View.VISIBLE);
         mCropRotateButton.setOnClickListener(v -> mCropImageView.rotateImage(90));
@@ -495,10 +527,11 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         });
 
         mCropImageView.setVisibility(View.VISIBLE);
-        mCropImageView.setImageBitmap(source);
+        mCropImageView.setImageBitmap(savedSource);
 
         if (mOpenCVCameraView != null) {
             mOpenCVCameraView.disableView();
+            mOpenCVCameraView.setVisibility(View.GONE);
         }
     }
 
@@ -572,14 +605,9 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             matToBitmap(greyscale, sourceGreyscale);
             sourceImages.add(sourceGreyscale);
 
+            // always landscape orientation!
+            rotatedRect.angle = rotatedRect.angle < -45 ? rotatedRect.angle + 90.f : rotatedRect.angle;
             double resultAngle = rotatedRect.angle;
-            resultAngle += 90.f; // for landscape mode
-            if (rotatedRect.size.width > rotatedRect.size.height) {
-                rotatedRect.angle += 90.f;
-            }
-
-            //Or
-            //rotatedRect.angle = rotatedRect.angle < -45 ? rotatedRect.angle + 90.f : rotatedRect.angle;
 
             Mat result = deskew(source, resultAngle);
 
@@ -605,12 +633,14 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         return src;
     }
 
-    private void reset() {
+    private void resetToInitial() {
         mCropImageView.setVisibility(View.GONE);
         mCropAcceptButton.setVisibility(View.GONE);
         mCropBackButton.setVisibility(View.GONE);
         mCropRotateButton.setVisibility(View.GONE);
         mCropSkewButton.setVisibility(View.GONE);
+
+        mOpenCVCameraView.setVisibility(View.VISIBLE);
         mOpenCVCameraView.enableView();
     }
 
@@ -657,26 +687,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
             return DriveUtils.createImage(contents, image, name, folder, mDriveResourceClient);
         })
-                .addOnSuccessListener(this,
-                        driveFile -> verifyUpload(name))
                 .addOnFailureListener(this, e -> {
                     Log.e(TAG, "Unable to create file", e);
                 });
-    }
-
-    private void verifyUpload(String name) {
-        Log.i(TAG, "Upload finished " + name);
-
-        mUploadedCounter++;
-
-        if (mUploadedCounter >= mMaxUploaded) {
-            mIsUploaded = true;
-            if (mIsRecognized) {
-                finish();
-            }
-
-            mUploadedCounter = 0;
-            mMaxUploaded = -1;
-        }
     }
 }

@@ -162,8 +162,7 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
                     mPreviewFormat = params.getPreviewFormat();
 
                     Log.d(TAG, "Set preview size to " + Integer.valueOf((int)frameSize.width) + "x" + Integer.valueOf((int)frameSize.height));
-                    //params.setPreviewSize((int)frameSize.width, (int)frameSize.height);
-                    params.setPreviewSize(800, 600); // TODO handle params
+                    params.setPreviewSize((int)frameSize.width, (int)frameSize.height);
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH && !android.os.Build.MODEL.equals("GT-I9100"))
                         params.setRecordingHint(true);
