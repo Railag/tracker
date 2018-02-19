@@ -1,9 +1,12 @@
 package com.firrael.tracker.openCV;
 
+import android.app.Activity;
 import android.content.Context;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.hardware.Camera;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.MotionEvent;
 
@@ -78,6 +81,7 @@ public class FocusCameraView extends JavaCameraView {
 
             for (Camera.Area area : focusAreas) {
                 Log.e(TAG, area.rect.flattenToString());
+                Log.e(TAG, "Width:" + (Math.abs(area.rect.left - area.rect.right) + " Height:" + (Math.abs(area.rect.bottom - area.rect.top))));
             }
 
             if (meteringAreaSupported) {
@@ -95,23 +99,39 @@ public class FocusCameraView extends JavaCameraView {
     /**
      * Convert touch position x:y to {@link Camera.Area} position -1000:-1000 to 1000:1000.
      */
-    private android.graphics.Rect calculateTapArea(float x, float y, float coefficient) {
-        float focusAreaSize = 72; // TODO update?
-        int areaSize = Float.valueOf(focusAreaSize * coefficient).intValue();
+    private android.graphics.Rect calculateTapArea(float x, float y, float coefficient) { // x,y - from touch events, x - height, y - width, full x = resolution - top black bar - bottom black bar
 
-        int left = clamp((int) x - areaSize / 2, 0, getWidth() - areaSize);
-        int top = clamp((int) y - areaSize / 2, 0, getHeight() - areaSize);
+        if (getContext() == null || !(getContext() instanceof Activity)) {
+            return new Rect(-1000, 900, 1000, -900); // whole screen
+        }
 
-        RectF rectF = new RectF(left, top, left + areaSize, top + areaSize);
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        Activity act = (Activity) getContext();
+        act.getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+        int realWidth = displayMetrics.widthPixels; // 1920
+        int realHeight = displayMetrics.heightPixels; // 1080
+
+        // 1903/1920, 14/1080.
+        //     /1000,   /1000.
+        int adjustedWidth = (int) (x * 1000 / realWidth);
+        int adjustedHeight = (int) (y * 1000 / realHeight);
+
+        float focusAreaValue = 72; // TODO update?
+        int focusAreaSize = Float.valueOf(focusAreaValue * coefficient).intValue();
+/*
+        int left = clamp(adjustedWidth - focusAreaSize / 2, 0, getWidth() - focusAreaSize);
+        int top = clamp(adjustedHeight - focusAreaSize / 2, 0, getHeight() - focusAreaSize);
+*/
+        RectF rectF = new RectF(adjustedWidth, adjustedHeight, adjustedWidth + focusAreaSize, adjustedHeight + focusAreaSize);
         getMatrix().mapRect(rectF);
 
-        final int l = clamp(Math.round(rectF.left), -1000, 900);
-        final int t = clamp(Math.round(rectF.top), -1000, 900);
-        final int r = clamp(Math.round(rectF.right), -900, 1000);
-        final int b = clamp(Math.round(rectF.bottom), -900, 1000);
+        final int l = clamp(Math.round(rectF.left), -1000, 1000); // TODO fix
+        final int t = clamp(Math.round(rectF.top), -1000, 1000);
+        final int r = clamp(Math.round(rectF.right), -1000, 1000);
+        final int b = clamp(Math.round(rectF.bottom), -1000, 1000);
 
         return new android.graphics.Rect(l, t, r, b);
-        //return new android.graphics.Rect((int) rectF.left, (int) rectF.top, (int) rectF.right, (int) rectF.bottom);
+        //    return new android.graphics.Rect((int) rectF.left, (int) rectF.top, (int) rectF.right, (int) rectF.bottom);
     }
 
     private int clamp(int x, int min, int max) {

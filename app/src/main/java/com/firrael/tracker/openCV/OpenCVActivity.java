@@ -366,7 +366,12 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private void detectRegions() {
         ///    Bitmap source = textSkew(mGrey);
         Bitmap source = Bitmap.createBitmap(mGrey.width(), mGrey.height(), Bitmap.Config.ARGB_8888);
-        matToBitmap(mGrey, source);
+//        matToBitmap(mGrey, source);
+
+
+        Mat tmp = imagePostProcessing(mGrey.clone());
+        matToBitmap(tmp, source);
+        // TODO PERFECT TEST Bitmap source = BitmapFactory.decodeResource(getResources(), R.drawable.test_ocr_image);
 
         // crop image
         mCropAcceptButton.setVisibility(View.VISIBLE);
@@ -378,7 +383,6 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             Mat croppedMat = new Mat();
             bitmapToMat(croppedBitmap, croppedMat);
             Imgproc.cvtColor(croppedMat, croppedMat, Imgproc.COLOR_BGR2GRAY); // convert bitmap back to grayscale mat
-
 
             mIntermediateMat = croppedMat;
 
@@ -496,6 +500,14 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         if (mOpenCVCameraView != null) {
             mOpenCVCameraView.disableView();
         }
+    }
+
+    private Mat imagePostProcessing(Mat mat) {
+        Imgproc.GaussianBlur(mat, mat, new Size(3, 3), 0);
+        Imgproc.adaptiveThreshold(mat, mat, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 5, 4);
+        Imgproc.threshold(mat, mat, 0, 255, Imgproc.THRESH_OTSU);
+        //    Imgproc.adaptiveThreshold(tmp, tmp, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
+        return mat;
     }
 
     private Bitmap textSkew(Mat greyscale) {
