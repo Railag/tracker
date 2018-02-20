@@ -14,9 +14,11 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 
 import com.firrael.tracker.App;
 import com.firrael.tracker.DriveUtils;
+import com.firrael.tracker.OpenCVUtils;
 import com.firrael.tracker.R;
 import com.firrael.tracker.SettingsFragment;
 import com.firrael.tracker.Utils;
@@ -60,8 +62,6 @@ import rx.functions.Action1;
 import rx.schedulers.Schedulers;
 import rx.subscriptions.CompositeSubscription;
 
-import static org.opencv.android.Utils.bitmapToMat;
-import static org.opencv.android.Utils.matToBitmap;
 import static org.opencv.imgproc.Imgproc.ADAPTIVE_THRESH_MEAN_C;
 import static org.opencv.imgproc.Imgproc.THRESH_BINARY;
 
@@ -76,7 +76,6 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     public final static String KEY_SCAN_RESULTS = "scanResults";
 
     private final static Scalar CONTOUR_COLOR = Scalar.all(100);
-    private static final int KERNEL_POWER = 50; // increase to make regions larger, decrease to make regions smaller
 
     private FocusCameraView mOpenCVCameraView;
     private CropImageView mCropImageView;
@@ -84,6 +83,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private ImageButton mCropBackButton;
     private ImageButton mCropRotateButton;
     private ImageButton mCropSkewButton;
+    private ImageButton mCropClearNoiseButton;
+    private LinearLayout mCropButtonsLayout;
 
     private Tesseract mTesseract;
     private MSER mDetector;
@@ -92,7 +93,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private int mTesseractCounter;
     private Tesseract.Language mLanguage;
     private CompositeSubscription mSubscription;
-    private Bitmap savedSource;
+    private Bitmap mSavedSource;
+    private Kernel mCurrentNoiseKernel;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -150,6 +152,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mCropBackButton = findViewById(R.id.cropImageBackButton);
         mCropRotateButton = findViewById(R.id.cropImageRotateButton);
         mCropSkewButton = findViewById(R.id.cropImageSkewButton);
+        mCropClearNoiseButton = findViewById(R.id.cropImageClearNoiseButton);
+        mCropButtonsLayout = findViewById(R.id.cropButtonsLayout);
 
         mOpenCVCameraView = findViewById(R.id.javaCameraView);
         mOpenCVCameraView.setOnLongClickListener(v1 -> {
@@ -394,27 +398,22 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     private void detectRegions(boolean initial) {
-        ///    Bitmap source = textSkew(mGrey);
+        mCurrentNoiseKernel = Kernel.TINY;
         if (initial) {
-            savedSource = Bitmap.createBitmap(mGrey.width(), mGrey.height(), Bitmap.Config.ARGB_8888);
-//        matToBitmap(mGrey, source);
-
-
             Mat tmp = imagePostProcessing(mGrey.clone());
-            matToBitmap(tmp, savedSource);
+            mSavedSource = OpenCVUtils.createBitmap(tmp);
         }
         // TODO PERFECT TEST Bitmap source = BitmapFactory.decodeResource(getResources(), R.drawable.test_ocr_image);
 
         // crop image
-        mCropAcceptButton.setVisibility(View.VISIBLE);
+        mCropButtonsLayout.setVisibility(View.VISIBLE);
+
         mCropAcceptButton.setOnClickListener(v -> {
             List<Bitmap> sourceImages = new ArrayList<>();
-            sourceImages.add(savedSource); // full image source
+            sourceImages.add(mSavedSource); // full image source
 
             Bitmap croppedBitmap = mCropImageView.getCroppedImage();
-            Mat croppedMat = new Mat();
-            bitmapToMat(croppedBitmap, croppedMat);
-            Imgproc.cvtColor(croppedMat, croppedMat, Imgproc.COLOR_BGR2GRAY); // convert bitmap back to grayscale mat
+            Mat croppedMat = OpenCVUtils.createMat(croppedBitmap);
 
             mIntermediateMat = croppedMat;
 
@@ -422,13 +421,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             List<KeyPoint> listpoint;
             KeyPoint kpoint;
             Mat mask = Mat.zeros(croppedMat.size(), CvType.CV_8UC1);
-            int rectanx1;
-            int rectany1;
-            int rectanx2;
-            int rectany2;
+            int rectanx1, rectany1, rectanx2, rectany2;
 
             List<MatOfPoint> contours = new ArrayList<>();
-            Mat kernel = new Mat(1, KERNEL_POWER, CvType.CV_8UC1, Scalar.all(255)); // KERNEL_POWER = region width
+            Mat kernel = Kernel.LARGE.generate();
             Mat morbyte = new Mat();
             Mat hierarchy = new Mat();
 
@@ -465,14 +461,12 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                 }
             }
 
-            Bitmap sourceMask = Bitmap.createBitmap(mask.width(), mask.height(), Bitmap.Config.ARGB_8888);
-            matToBitmap(mask, sourceMask);
+            Bitmap sourceMask = OpenCVUtils.createBitmap(mask);
             sourceImages.add(sourceMask); // mask before dilation filter, but with detected contours
 
             Imgproc.morphologyEx(mask, morbyte, Imgproc.MORPH_DILATE, kernel); // dilate filter
 
-            Bitmap sourceImage = Bitmap.createBitmap(morbyte.width(), morbyte.height(), Bitmap.Config.ARGB_8888);
-            matToBitmap(morbyte, sourceImage);
+            Bitmap sourceImage = OpenCVUtils.createBitmap(morbyte);
             sourceImages.add(sourceImage); // mask after dilation filter
 
             Imgproc.findContours(morbyte, contours, hierarchy,
@@ -490,8 +484,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                 try {
                     Mat croppedPart;
                     croppedPart = mIntermediateMat.submat(rectan3);
-                    bmp = Bitmap.createBitmap(croppedPart.width(), croppedPart.height(), Bitmap.Config.ARGB_8888);
-                    matToBitmap(croppedPart, bmp);
+                    bmp = OpenCVUtils.createBitmap(croppedPart);
                 } catch (Exception e) {
                     Log.d(TAG, "cropped part data error " + e.getMessage());
                 }
@@ -500,8 +493,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                 }
             }
 
-            Bitmap sourceCropped = Bitmap.createBitmap(croppedMat.width(), croppedMat.height(), Bitmap.Config.ARGB_8888);
-            matToBitmap(croppedMat, sourceImage);
+            Bitmap sourceCropped = OpenCVUtils.createBitmap(croppedMat);
             sourceImages.add(sourceCropped);
 
             BitmapResults results = new BitmapResults(bitmapsToRecognize, sourceImages);
@@ -509,25 +501,30 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             processBitmapResults(results);
         });
 
-        mCropBackButton.setVisibility(View.VISIBLE);
         mCropBackButton.setOnClickListener(v -> resetToInitial());
 
-        mCropRotateButton.setVisibility(View.VISIBLE);
         mCropRotateButton.setOnClickListener(v -> mCropImageView.rotateImage(90));
 
-        mCropSkewButton.setVisibility(View.VISIBLE);
+        mCropClearNoiseButton.setOnClickListener(v -> {
+            Bitmap croppedBitmap = mCropImageView.getCroppedImage();
+            Mat croppedMat = OpenCVUtils.createMat(croppedBitmap);
+
+            croppedMat = clearNoise(croppedMat);
+            Bitmap clearBitmap = OpenCVUtils.createBitmap(croppedMat);
+            mCropImageView.setImageBitmap(clearBitmap);
+        });
+
         mCropSkewButton.setOnClickListener(v -> {
             Bitmap croppedBitmap = mCropImageView.getCroppedImage();
-            Mat croppedMat = new Mat();
-            bitmapToMat(croppedBitmap, croppedMat);
-            Imgproc.cvtColor(croppedMat, croppedMat, Imgproc.COLOR_BGR2GRAY);
+            Mat croppedMat = OpenCVUtils.createMat(croppedBitmap);
 
             Bitmap skewedBitmap = textSkew(croppedMat);
             mCropImageView.setImageBitmap(skewedBitmap);
         });
 
         mCropImageView.setVisibility(View.VISIBLE);
-        mCropImageView.setImageBitmap(savedSource);
+        mCropImageView.setImageBitmap(mSavedSource);
+        mCropImageView.resetCropRect();
 
         if (mOpenCVCameraView != null) {
             mOpenCVCameraView.disableView();
@@ -535,19 +532,81 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
     }
 
+    private Mat clearNoise(Mat mat) {
+        Mat kernel = mCurrentNoiseKernel.generate();
+        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
+
+        mCurrentNoiseKernel.increase();
+        return mat;
+    }
+
     private Mat imagePostProcessing(Mat mat) {
-        Imgproc.GaussianBlur(mat, mat, new Size(3, 3), 0);
+/*        float fishVal = 600.0f;
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+        int cX = displayMetrics.widthPixels; // 1920
+        int cY = displayMetrics.heightPixels; // 1080
+
+        Mat k = new Mat(3, 3, CvType.CV_32FC1);
+        k.put(0, 0, new float[]{fishVal, 0, cX});
+        k.put(1, 0, new float[]{0, fishVal, cY});
+        k.put(2, 0, new float[]{0, 0, 1});
+
+        Mat d = new Mat(1, 4, CvType.CV_32FC1);
+        d.put(0, 0, new float[]{0, 0, 0, 0});
+
+        Mat kNew = k.clone();
+        kNew.put(0, 0, new float[]{fishVal * 0.4f, 0.0f, cX});
+        kNew.put(1, 0, new float[]{0.0f, fishVal * 0.4f, cY});
+        kNew.put(2, 0, new float[]{0.0f, 0.0f, 1.0f});
+
+    //    Imgproc.undistort(mat, mat, k, d, kNew);
+        Calib3d.undistortImage(mat, mat, k, d, kNew, mat.size());*/
+
+        List<Bitmap> sourceImages = new ArrayList<>();
+
+        Bitmap sourceImage = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceImage);
+
+        Imgproc.GaussianBlur(mat, mat, new Size(3, 3), 0); // TODO gaussian -> median?
+        //Imgproc.medianBlur(mat, mat, 3);
+
+        sourceImage = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceImage);
+
         Imgproc.adaptiveThreshold(mat, mat, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 5, 4);
+
+        sourceImage = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceImage);
+
+        Mat kernel = Kernel.SMALL.generate();
+        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
+
+        sourceImage = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceImage);
+
+        // TODO enable?    Mat erodeKernel = Kernel.TINY.generate();
+        //    Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_ERODE, erodeKernel);
+
+        sourceImage = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceImage);
+
         Imgproc.threshold(mat, mat, 0, 255, Imgproc.THRESH_OTSU);
+
+        sourceImage = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceImage);
+
+        uploadBitmapsToGoogleDrive(new ArrayList<>(), sourceImages);
+
         //    Imgproc.adaptiveThreshold(tmp, tmp, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
         return mat;
     }
 
+
     private Bitmap textSkew(Mat greyscale) {
         List<Bitmap> sourceImages = new ArrayList<>();
 
-        Bitmap sourceImage = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
-        matToBitmap(greyscale, sourceImage);
+        Bitmap sourceImage = OpenCVUtils.createBitmap(greyscale);
         sourceImages.add(sourceImage);
 
         Mat source = greyscale.clone();
@@ -557,31 +616,27 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         Imgproc.adaptiveThreshold(greyscale, greyscale, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
         //Imgproc.threshold(greyscale, greyscale, 200, 255, Imgproc.THRESH_BINARY);
 
-        Bitmap sourceThreshold = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
-        matToBitmap(greyscale, sourceThreshold);
+        Bitmap sourceThreshold = OpenCVUtils.createBitmap(greyscale);
         sourceImages.add(sourceThreshold);
 
         //Invert the colors (because objects are represented as white pixels, and the background is represented by black pixels)
         Core.bitwise_not(greyscale, greyscale);
         Mat element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(3, 3));
 
-        Bitmap sourceElement = Bitmap.createBitmap(element.width(), element.height(), Bitmap.Config.ARGB_8888);
-        matToBitmap(element, sourceElement);
+        Bitmap sourceElement = OpenCVUtils.createBitmap(element);
         sourceImages.add(sourceElement);
 
         //We can now perform our erosion, we must declare our rectangle-shaped structuring element and call the erode function
         Imgproc.erode(greyscale, greyscale, element);
 
-        Bitmap sourceErodedGreyscale = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
-        matToBitmap(greyscale, sourceErodedGreyscale);
+        Bitmap sourceErodedGreyscale = OpenCVUtils.createBitmap(greyscale);
         sourceImages.add(sourceErodedGreyscale);
 
         //Find all white pixels
         Mat wLocMat = Mat.zeros(greyscale.size(), greyscale.type());
         Core.findNonZero(greyscale, wLocMat);
 
-        Bitmap sourceLockMat = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
-        matToBitmap(greyscale, sourceLockMat);
+        Bitmap sourceLockMat = OpenCVUtils.createBitmap(greyscale);
         sourceImages.add(sourceLockMat);
 
         //Create an empty Mat and pass it to the function
@@ -601,8 +656,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             boxContours.add(new MatOfPoint(vertices));
             Imgproc.drawContours(greyscale, boxContours, 0, new Scalar(128, 128, 128), -1);
 
-            Bitmap sourceGreyscale = Bitmap.createBitmap(greyscale.width(), greyscale.height(), Bitmap.Config.ARGB_8888);
-            matToBitmap(greyscale, sourceGreyscale);
+            Bitmap sourceGreyscale = OpenCVUtils.createBitmap(greyscale);
             sourceImages.add(sourceGreyscale);
 
             // always landscape orientation!
@@ -611,8 +665,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
             Mat result = deskew(source, resultAngle);
 
-            Bitmap bitmap = Bitmap.createBitmap(result.width(), result.height(), Bitmap.Config.ARGB_8888);
-            matToBitmap(result, bitmap);
+            Bitmap bitmap = OpenCVUtils.createBitmap(result);
             sourceImages.add(bitmap);
 
             uploadBitmapsToGoogleDrive(new ArrayList<>(), sourceImages);
@@ -635,10 +688,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private void resetToInitial() {
         mCropImageView.setVisibility(View.GONE);
-        mCropAcceptButton.setVisibility(View.GONE);
-        mCropBackButton.setVisibility(View.GONE);
-        mCropRotateButton.setVisibility(View.GONE);
-        mCropSkewButton.setVisibility(View.GONE);
+        mCropButtonsLayout.setVisibility(View.GONE);
 
         mOpenCVCameraView.setVisibility(View.VISIBLE);
         mOpenCVCameraView.enableView();

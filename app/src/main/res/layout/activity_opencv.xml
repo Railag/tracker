@@ -15,48 +15,53 @@
         android:layout_height="match_parent"
         android:visibility="gone" />
 
-    <ImageButton
-        android:id="@+id/cropImageAcceptButton"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:id="@+id/cropButtonsLayout"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:layout_marginBottom="16dp"
-        android:visibility="gone"
-        app:srcCompat="@drawable/ic_done_black_24dp" />
+        android:gravity="center_horizontal"
+        android:orientation="horizontal"
+        android:visibility="gone">
 
-    <ImageButton
-        android:id="@+id/cropImageBackButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="16dp"
-        android:layout_toEndOf="@id/cropImageAcceptButton"
-        android:visibility="gone"
-        app:srcCompat="@drawable/ic_close_black_24dp" />
+        <ImageButton
+            android:id="@+id/cropImageAcceptButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:srcCompat="@drawable/ic_done_black_24dp" />
 
-    <ImageButton
-        android:id="@+id/cropImageRotateButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="16dp"
-        android:layout_marginEnd="8dp"
-        android:layout_toEndOf="@id/cropImageBackButton"
-        android:visibility="gone"
-        app:srcCompat="@drawable/ic_rotate_90_degrees_ccw_black_24dp" />
+        <ImageButton
+            android:id="@+id/cropImageBackButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:srcCompat="@drawable/ic_close_black_24dp" />
 
-    <ImageButton
-        android:id="@+id/cropImageSkewButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="16dp"
-        android:layout_marginEnd="8dp"
-        android:layout_toEndOf="@id/cropImageRotateButton"
-        android:visibility="gone"
-        app:srcCompat="@drawable/ic_format_textdirection_l_to_r_black_24dp" />
+        <ImageButton
+            android:id="@+id/cropImageRotateButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:layout_marginEnd="8dp"
+            app:srcCompat="@drawable/ic_rotate_90_degrees_ccw_black_24dp" />
+
+        <ImageButton
+            android:id="@+id/cropImageClearNoiseButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:layout_marginEnd="8dp"
+            app:srcCompat="@drawable/ic_border_clear_black_24dp" />
+
+        <ImageButton
+            android:id="@+id/cropImageSkewButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:layout_marginEnd="8dp"
+            app:srcCompat="@drawable/ic_format_textdirection_l_to_r_black_24dp" />
+
+    </LinearLayout>
 </RelativeLayout>
