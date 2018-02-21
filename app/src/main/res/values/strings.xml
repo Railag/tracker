@@ -43,4 +43,8 @@
     <string name="results">Results</string>
     <string name="reset_image">Reset image</string>
     <string name="take_another_image">Take Another Image</string>
+    <string name="en">EN</string>
+    <string name="ru">RU</string>
+    <string name="locale_us">en_US</string>
+    <string name="locale_ru">ru_RU</string>
 </resources>

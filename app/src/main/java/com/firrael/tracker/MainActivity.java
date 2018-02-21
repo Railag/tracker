@@ -156,11 +156,15 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void startLoading() {
-        loading.setVisibility(View.VISIBLE);
+        if (loading != null) {
+            loading.setVisibility(View.VISIBLE);
+        }
     }
 
     public void stopLoading() {
-        loading.setVisibility(View.GONE);
+        if (loading != null) {
+            loading.setVisibility(View.GONE);
+        }
     }
 
     private <T extends Fragment> void setFragment(final T fragment) {

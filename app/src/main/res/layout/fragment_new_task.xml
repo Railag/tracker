@@ -25,4 +25,36 @@
         android:layout_marginBottom="30dp"
         app:srcCompat="@drawable/ic_keyboard_voice_black_76dp" />
 
+    <RadioGroup
+        android:id="@+id/language_radio_group"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/task_name_edit"
+        android:layout_alignBaseline="@+id/voice_icon"
+        android:layout_centerVertical="true"
+        android:layout_marginBottom="30dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_toStartOf="@+id/voice_icon">
+
+        <RadioButton
+            android:id="@+id/language_radio_button_en"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/en"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <RadioButton
+            android:id="@+id/language_radio_button_ru"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/ru"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+    </RadioGroup>
+
 </RelativeLayout>

@@ -14,6 +14,7 @@ import android.view.inputmethod.InputMethodManager;
 
 import com.firrael.tracker.realm.TaskModel;
 import com.firrael.tracker.tesseract.RecognizedRegion;
+import com.firrael.tracker.tesseract.Tesseract;
 import com.google.gson.ExclusionStrategy;
 import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
@@ -206,5 +207,22 @@ public class Utils {
         } else {
             return String.valueOf(minutes);
         }
+    }
+
+    public static Tesseract.Language getLanguage(Context context) {
+        Tesseract.Language language = Tesseract.Language.EN; // default
+
+        String savedLanguage = Utils.prefs(context).getString(SettingsFragment.LANGUAGE_KEY, "");
+        if (!TextUtils.isEmpty(savedLanguage)) {
+            Tesseract.Language[] languages = Tesseract.Language.LANGUAGES;
+            for (Tesseract.Language lang : languages) {
+                if (lang.getLocaleTag().equalsIgnoreCase(savedLanguage)) {
+                    language = lang;
+                    break;
+                }
+            }
+        }
+
+        return language;
     }
 }

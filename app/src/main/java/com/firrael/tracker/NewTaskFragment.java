@@ -14,12 +14,13 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.RadioGroup;
 
 import com.firrael.tracker.base.SimpleFragment;
+import com.firrael.tracker.tesseract.Tesseract;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Locale;
 
 /**
  * Created by railag on 15.01.2018.
@@ -40,6 +41,7 @@ public class NewTaskFragment extends SimpleFragment {
 
     private EditText mTaskNameEdit;
     private ImageView mVoiceIcon;
+    private RadioGroup mLanguageRadioGroup;
 
     private SpeechRecognizer mRecognizer;
 
@@ -57,6 +59,21 @@ public class NewTaskFragment extends SimpleFragment {
     protected void initView(View v) {
         mTaskNameEdit = v.findViewById(R.id.task_name_edit);
         mVoiceIcon = v.findViewById(R.id.voice_icon);
+        mLanguageRadioGroup = v.findViewById(R.id.language_radio_group);
+
+        Tesseract.Language language = Utils.getLanguage(getActivity());
+        int languageButtonId;
+        switch (language) {
+            case RU:
+                languageButtonId = R.id.language_radio_button_ru;
+                break;
+            default:
+            case EN:
+                languageButtonId = R.id.language_radio_button_en;
+                break;
+        }
+
+        mLanguageRadioGroup.check(languageButtonId);
 
         toggleFab(false);
 
@@ -200,8 +217,12 @@ public class NewTaskFragment extends SimpleFragment {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
 
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        //intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru_RU");
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+
+        boolean isEN = mLanguageRadioGroup.getCheckedRadioButtonId() == R.id.language_radio_button_en;
+        String language = isEN ? getString(R.string.locale_us) : getString(R.string.locale_ru);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, language);
+
+        //intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.ENG);
         //    intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Hello, How can I help you?");
         mRecognizer.startListening(intent);
     }

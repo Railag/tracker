@@ -171,22 +171,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     private void initializeLanguage() {
-        String savedLanguage = Utils.prefs(this).getString(SettingsFragment.LANGUAGE_KEY, "");
-        if (TextUtils.isEmpty(savedLanguage)) {
-            mLanguage = Tesseract.Language.EN;
-        } else {
-            Tesseract.Language[] languages = Tesseract.Language.LANGUAGES;
-            for (Tesseract.Language language : languages) {
-                if (language.getLocaleTag().equalsIgnoreCase(savedLanguage)) {
-                    mLanguage = language;
-                    break;
-                }
-            }
-
-            if (mLanguage == null) {
-                mLanguage = Tesseract.Language.EN;
-            }
-        }
+        mLanguage = Utils.getLanguage(this);
     }
 
     private void initializeTesseract() {
@@ -579,14 +564,15 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         sourceImage = OpenCVUtils.createBitmap(mat);
         sourceImages.add(sourceImage);
 
-        Mat kernel = Kernel.SMALL.generate();
+        Mat kernel = Kernel.TINY.generate();
         Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
 
         sourceImage = OpenCVUtils.createBitmap(mat);
         sourceImages.add(sourceImage);
 
-        // TODO enable?    Mat erodeKernel = Kernel.TINY.generate();
-        //    Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_ERODE, erodeKernel);
+        // TODO enable?
+        Mat erodeKernel = Kernel.TINY.generate();
+        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_ERODE, erodeKernel);
 
         sourceImage = OpenCVUtils.createBitmap(mat);
         sourceImages.add(sourceImage);
