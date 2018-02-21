@@ -16,6 +16,7 @@ import java.util.List;
 
 import io.realm.Realm;
 import io.realm.RealmResults;
+import io.realm.Sort;
 
 /**
  * Created by railag on 04.01.2018.
@@ -77,7 +78,7 @@ public class LandingTaskFragment extends SimpleFragment {
 
     private List<TaskModel> loadTasks() {
         Realm realm = RealmDB.get();
-        final RealmResults<TaskModel> tasks = realm.where(TaskModel.class).findAll().sort("startDate");
+        final RealmResults<TaskModel> tasks = realm.where(TaskModel.class).findAll().sort("startDate", Sort.DESCENDING);
 
         return tasks;
     }
