@@ -8,7 +8,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
@@ -20,7 +19,7 @@ import com.firrael.tracker.App;
 import com.firrael.tracker.DriveUtils;
 import com.firrael.tracker.OpenCVUtils;
 import com.firrael.tracker.R;
-import com.firrael.tracker.SettingsFragment;
+import com.firrael.tracker.TestUtils;
 import com.firrael.tracker.Utils;
 import com.firrael.tracker.tesseract.RecognizedRegion;
 import com.firrael.tracker.tesseract.Tesseract;
@@ -383,12 +382,25 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     private void detectRegions(boolean initial) {
-        mCurrentNoiseKernel = Kernel.TINY;
-        if (initial) {
-            Mat tmp = imagePostProcessing(mGrey.clone());
-            mSavedSource = OpenCVUtils.createBitmap(tmp);
-        }
         // TODO PERFECT TEST Bitmap source = BitmapFactory.decodeResource(getResources(), R.drawable.test_ocr_image);
+        //      Bitmap source = BitmapFactory.decodeResource(getResources(), R.drawable.test_ocr_image_2);
+//        Mat sourceMat = imagePostProcessing(OpenCVUtils.createMat(source));
+        //    mSavedSource = OpenCVUtils.createBitmap(sourceMat);
+
+        Mat sourceMat = TestUtils.loadImage();
+
+        if (Core.countNonZero(sourceMat) != 0) { // non-empty matrix (and not 0x0 matrix)
+            mSavedSource = OpenCVUtils.createBitmap(imagePostProcessing(sourceMat));
+        } else {
+            TestUtils.saveImage(mGrey.clone());
+
+            if (initial) {
+                Mat tmp = imagePostProcessing(mGrey.clone());
+                mSavedSource = OpenCVUtils.createBitmap(tmp);
+            }
+        }
+
+        mCurrentNoiseKernel = Kernel.TINY;
 
         // crop image
         mCropButtonsLayout.setVisibility(View.VISIBLE);
@@ -678,6 +690,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         mOpenCVCameraView.setVisibility(View.VISIBLE);
         mOpenCVCameraView.enableView();
+
+        TestUtils.removeImage();
     }
 
     @Override
