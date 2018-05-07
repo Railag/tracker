@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
@@ -118,6 +119,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private boolean isTested;
     private String folderName;
+    private String mCurrentTimeStamp;
+
+    private ArrayList<Bitmap> mCurrentSourceBitmaps = new ArrayList<>();
+    private ArrayList<BitmapRegion> mCurrentBitmapRegions = new ArrayList<>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -181,18 +186,23 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private void test() {
         int resourceId = R.drawable.test_ocr_image;
-        Bitmap bmp = BitmapFactory.decodeResource(getResources(), resourceId);
+        try {
+            Bitmap bmp = BitmapFactory.decodeResource(getResources(), resourceId);
 
-        Mat sourceMat = OpenCVUtils.createMat(bmp);
+            Mat sourceMat = OpenCVUtils.createMat(bmp);
 
-        if (Core.countNonZero(sourceMat) != 0) { // non-empty matrix (and not 0x0 matrix)
-            mSavedSource = OpenCVUtils.createBitmap(imagePostProcessing(sourceMat));
+            if (Core.countNonZero(sourceMat) != 0) { // non-empty matrix (and not 0x0 matrix)
+                mSavedSource = OpenCVUtils.createBitmap(imagePostProcessing(sourceMat));
 
-            sourceMat = clearNoise(sourceMat);
+                sourceMat = clearNoise(sourceMat);
 
-            sourceMat = OpenCVUtils.createMat(textSkew(sourceMat));
+                sourceMat = OpenCVUtils.createMat(textSkew(sourceMat));
 
-            recognizeMat(sourceMat);
+                recognizeMat(sourceMat);
+            }
+        } catch (OutOfMemoryError e) {
+            e.printStackTrace();
+            finish();
         }
 
     }
@@ -385,7 +395,15 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         ArrayList<RecognizedRegion> results = new ArrayList<>(s);
         data.putParcelableArrayListExtra(KEY_SCAN_RESULTS, results);
         setResult(RESULT_OK, data);
+        resetCurrentDriveData();
+
         showResults(results);
+    }
+
+    private void resetCurrentDriveData() {
+        mCurrentTimeStamp = null;
+        mCurrentBitmapRegions = new ArrayList<>();
+        mCurrentSourceBitmaps = new ArrayList<>();
     }
 
     private void showResults(ArrayList<RecognizedRegion> results) {
@@ -648,8 +666,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         Bitmap sourceImage = OpenCVUtils.createBitmap(mat);
         sourceImages.add(sourceImage);
 
-        Imgproc.GaussianBlur(mat, mat, new Size(3, 3), 0); // TODO gaussian -> median?
-        //Imgproc.medianBlur(mat, mat, 3);
+        //Imgproc.GaussianBlur(mat, mat, new Size(3, 3), 0); // TODO gaussian -> median?
+        Imgproc.medianBlur(mat, mat, 3);
 
         sourceImage = OpenCVUtils.createBitmap(mat);
         sourceImages.add(sourceImage);
@@ -783,26 +801,35 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     public void uploadBitmapsToGoogleDrive(List<BitmapRegion> regions, List<Bitmap> sourceBitmaps) {
-        String timeStamp = Utils.getCurrentTimestamp();
-        folderName = timeStamp + " openCV";
+        mCurrentBitmapRegions.addAll(regions);
 
-        Task<DriveFolder> folderTask = DriveUtils.createFolder(folderName, mDriveResourceClient);
-        folderTask.continueWith(task -> {
-            DriveFolder parentFolder = folderTask.getResult();
+        if (sourceBitmaps != null && sourceBitmaps.size() > 0) {
+            mCurrentSourceBitmaps.addAll(sourceBitmaps);
+        }
 
-            for (int i = 0; i < regions.size(); i++) {
-                BitmapRegion region = regions.get(i);
-                addGoogleDriveImage(region.getBitmap(), "region #" + region.getRegionNumber(), folderName);
-            }
+        if (TextUtils.isEmpty(mCurrentTimeStamp)) {
+            mCurrentTimeStamp = Utils.getCurrentTimestamp();
 
-            if (sourceBitmaps != null && sourceBitmaps.size() > 0) {
-                for (int i = 0; i < sourceBitmaps.size(); i++) {
-                    addGoogleDriveImage(sourceBitmaps.get(i), "source image " + i, folderName);
+            folderName = mCurrentTimeStamp + " openCV";
+
+            Task<DriveFolder> folderTask = DriveUtils.createFolder(folderName, mDriveResourceClient);
+            folderTask.continueWith(task -> {
+                DriveFolder parentFolder = folderTask.getResult();
+
+                for (int i = 0; i < mCurrentBitmapRegions.size(); i++) {
+                    BitmapRegion region = mCurrentBitmapRegions.get(i);
+                    addGoogleDriveImage(region.getBitmap(), "region #" + region.getRegionNumber(), folderName);
                 }
-            }
 
-            return null;
-        });
+                if (mCurrentSourceBitmaps != null && mCurrentSourceBitmaps.size() > 0) {
+                    for (int i = 0; i < mCurrentSourceBitmaps.size(); i++) {
+                        addGoogleDriveImage(mCurrentSourceBitmaps.get(i), "source image " + i, folderName);
+                    }
+                }
+
+                return null;
+            });
+        }
     }
 
 
