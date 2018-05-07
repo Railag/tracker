@@ -106,7 +106,11 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                         initDetector();
                     }
 
-                    mOpenCVCameraView.enableView();
+                    if (!isTested) {
+                        mOpenCVCameraView.enableView();
+                    } else {
+                        test();
+                    }
                 }
                 break;
                 default: {
@@ -315,10 +319,6 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mIntermediateMat = new Mat();
         mGrey = new Mat(height, width, CvType.CV_8UC4);
         mRgba = new Mat(height, width, CvType.CV_8UC4);
-
-        if (isTested) {
-            test();
-        }
     }
 
     public void processBitmapResults(BitmapResults bitmapResults) {
