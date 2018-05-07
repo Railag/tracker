@@ -187,9 +187,14 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         if (Core.countNonZero(sourceMat) != 0) { // non-empty matrix (and not 0x0 matrix)
             mSavedSource = OpenCVUtils.createBitmap(imagePostProcessing(sourceMat));
+
+            sourceMat = clearNoise(sourceMat);
+
+            sourceMat = OpenCVUtils.createMat(textSkew(sourceMat));
+
+            recognizeMat(sourceMat);
         }
 
-        recognizeMat(sourceMat);
     }
 
     private void initializeLanguage() {
@@ -262,6 +267,17 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     @Override
     public void onResume() {
         super.onResume();
+
+        if (!Utils.checkCameraPermission(this)) {
+            Utils.verifyCameraPermission(this);
+            return;
+        }
+
+        if (!Utils.checkDiskPermission(this)) {
+            Utils.verifyStoragePermissions(this);
+            return;
+        }
+
         if (!OpenCVLoader.initDebug()) {
             OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_4_0, this, mLoaderCallback);
         } else {
@@ -592,7 +608,12 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     private Mat clearNoise(Mat mat) {
+        if (mCurrentNoiseKernel == null) {
+            mCurrentNoiseKernel = Kernel.TINY;
+        }
+
         Mat kernel = mCurrentNoiseKernel.generate();
+
         Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
 
         mCurrentNoiseKernel.increase();
@@ -638,7 +659,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         sourceImage = OpenCVUtils.createBitmap(mat);
         sourceImages.add(sourceImage);
 
-        Mat kernel = Kernel.TINY.generate();
+   /*     Mat kernel = Kernel.TINY.generate();
         Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
 
         sourceImage = OpenCVUtils.createBitmap(mat);
@@ -647,7 +668,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         // TODO enable?
         Mat erodeKernel = Kernel.TINY.generate();
         Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_ERODE, erodeKernel);
-
+*/
         sourceImage = OpenCVUtils.createBitmap(mat);
         sourceImages.add(sourceImage);
 

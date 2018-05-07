@@ -65,10 +65,10 @@ public class ParallelDotsHelper {
         }
     }
 
-    private static void setUpCert(String hostname) throws Exception {
+    private static void setUpCert() throws Exception {
         SSLSocketFactory factory = HttpsURLConnection.getDefaultSSLSocketFactory();
 
-        SSLSocket socket = (SSLSocket) factory.createSocket(hostname, 443);
+        SSLSocket socket = (SSLSocket) factory.createSocket("apis.paralleldots.com", 443);
         try {
             socket.startHandshake();
             socket.close();
@@ -92,7 +92,7 @@ public class ParallelDotsHelper {
         context.init(null, new TrustManager[]{tm}, null);
         factory = context.getSocketFactory();
 
-        socket = (SSLSocket) factory.createSocket(hostname, 443);
+        socket = (SSLSocket) factory.createSocket("apis.paralleldots.com", 443);
         try {
             socket.startHandshake();
         } catch (SSLException e) {
@@ -105,7 +105,7 @@ public class ParallelDotsHelper {
         }
 
         X509Certificate cert = chain[0];
-        String alias = hostname;
+        String alias = "apis.paralleldots.com";
         ks.setCertificateEntry(alias, cert);
 
         //System.out.println("copy this file to your jre/lib/security folder");
@@ -116,10 +116,10 @@ public class ParallelDotsHelper {
 
     public static void findDiff(Activity activity, String text1, String text2, String fileName, String folderName, DriveResourceClient driveResourceClient) {
         try {
-            setUpCert("apis.paralleldots.com");
+            setUpCert();
 
             final String api_key = "K4m7Q6nEPuKGhpv8nN0X2X0cUScGNO1tpxDY3UoFjWw";
-            final String host = "https://apis.paralleldots.com/v3/findDiff";
+            final String host = "https://apis.paralleldots.com/v3/similarity";
             OkHttpClient client = new OkHttpClient.Builder()
                     .connectTimeout(30, TimeUnit.SECONDS)
                     .readTimeout(30, TimeUnit.SECONDS)
