@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.design.widget.Snackbar;
@@ -50,10 +51,29 @@ import org.opencv.core.Size;
 import org.opencv.features2d.MSER;
 import org.opencv.imgproc.Imgproc;
 
+import java.io.FileOutputStream;
+import java.security.KeyStore;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
+
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import rx.Emitter;
 import rx.Observable;
 import rx.android.schedulers.AndroidSchedulers;
@@ -73,6 +93,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private final static String TAG = OpenCVActivity.class.getSimpleName();
 
     public final static String KEY_SCAN_RESULTS = "scanResults";
+    public final static String KEY_TEST = "test";
 
     private final static Scalar CONTOUR_COLOR = Scalar.all(100);
 
@@ -113,6 +134,9 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             }
         }
     };
+
+    private boolean isTested;
+    private String folderName;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -167,6 +191,24 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         mOpenCVCameraView.setVisibility(View.VISIBLE);
         mOpenCVCameraView.setCvCameraViewListener(this);
+
+        Intent intent = getIntent();
+        if (intent.hasExtra(KEY_TEST)) {
+            isTested = true;
+        }
+    }
+
+    private void test() {
+        int resourceId = R.drawable.test_ocr_image;
+        Bitmap bmp = BitmapFactory.decodeResource(getResources(), resourceId);
+
+        Mat sourceMat = OpenCVUtils.createMat(bmp);
+
+        if (Core.countNonZero(sourceMat) != 0) { // non-empty matrix (and not 0x0 matrix)
+            mSavedSource = OpenCVUtils.createBitmap(imagePostProcessing(sourceMat));
+        }
+
+        recognizeMat(sourceMat);
     }
 
     private void initializeLanguage() {
@@ -266,6 +308,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mIntermediateMat = new Mat();
         mGrey = new Mat(height, width, CvType.CV_8UC4);
         mRgba = new Mat(height, width, CvType.CV_8UC4);
+
+        if (isTested) {
+            test();
+        }
     }
 
     public void processBitmapResults(BitmapResults bitmapResults) {
@@ -347,34 +393,177 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private void showResults(ArrayList<RecognizedRegion> results) {
 
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < results.size(); i++) {
-            RecognizedRegion line = results.get(i);
-            builder.append("region#");
-            builder.append(line.getRegionNumber());
-            builder.append(": ");
-            builder.append(line);
-            builder.append("\n");
+        if (isTested) {
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < results.size(); i++) {
+                RecognizedRegion line = results.get(i);
+                builder.append(line);
+            }
+
+            uploadDiffToGoogleDrive(builder.toString(), folderName, "diff");
+        } else {
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < results.size(); i++) {
+                RecognizedRegion line = results.get(i);
+                builder.append("region#");
+                builder.append(line.getRegionNumber());
+                builder.append(": ");
+                builder.append(line);
+                builder.append("\n");
+            }
+
+            AlertDialog dialog = new AlertDialog.Builder(this)
+                    .setTitle(R.string.results)
+                    .setMessage(builder.toString())
+                    .setPositiveButton(R.string.done, (d, which) -> {
+                        d.dismiss();
+                        finish();
+                    })
+                    .setNeutralButton(R.string.reset_image, (d, which) -> {
+                        d.dismiss();
+                        resetToSourceImage();
+                    })
+                    .setNegativeButton(R.string.take_another_image, (d, which) -> {
+                        d.dismiss();
+                        resetToInitial();
+                    })
+                    .create();
+            dialog.show();
+        }
+    }
+
+    private void uploadDiffToGoogleDrive(String recognizedText, String folderName, String fileName) {
+        String sourceText = TestUtils.readTextFile(this, "test_ocr_text");
+
+        Observable.create((Action1<Emitter<String>>) emitter -> {
+            try {
+                similarity(sourceText, recognizedText, fileName, folderName);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            emitter.onCompleted();
+        }, Emitter.BackpressureMode.LATEST)
+                .subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(aVoid -> {
+                        }, this::onError,
+                        () -> Log.i(TAG, "Similarity uploaded to Google Drive."));
+    }
+
+    private static class SavingTrustManager implements X509TrustManager {
+
+        private final X509TrustManager tm;
+        private X509Certificate[] chain;
+
+        SavingTrustManager(X509TrustManager tm) {
+            this.tm = tm;
+        }
+
+        public X509Certificate[] getAcceptedIssuers() {
+
+            return new X509Certificate[0];
+        }
+
+        public void checkClientTrusted(X509Certificate[] chain, String authType)
+                throws CertificateException {
+            throw new UnsupportedOperationException();
+        }
+
+        public void checkServerTrusted(X509Certificate[] chain, String authType)
+                throws CertificateException {
+            this.chain = chain;
+            tm.checkServerTrusted(chain, authType);
+        }
+    }
+
+    public void setUpCert(String hostname) throws Exception {
+        SSLSocketFactory factory = HttpsURLConnection.getDefaultSSLSocketFactory();
+
+        SSLSocket socket = (SSLSocket) factory.createSocket(hostname, 443);
+        try {
+            socket.startHandshake();
+            socket.close();
+            //System.out.println("No errors, certificate is already trusted");
+            return;
+        } catch (SSLException e) {
+            //System.out.println("cert likely not found in keystore, will pull cert...");
         }
 
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.results)
-                .setMessage(builder.toString())
-                .setPositiveButton(R.string.done, (dialog13, which) -> {
-                    dialog13.dismiss();
-                    finish();
-                })
-                .setNeutralButton(R.string.reset_image, (dialog12, which) -> {
-                    dialog12.dismiss();
-                    resetToSourceImage();
-                })
-                .setNegativeButton(R.string.take_another_image, (dialog1, which) -> {
-                    dialog1.dismiss();
-                    resetToInitial();
-                })
-                .create();
-        dialog.show();
+        KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+        char[] password = "changeit".toCharArray();
+        ks.load(null, password);
+
+        SSLContext context = SSLContext.getInstance("TLS");
+        TrustManagerFactory tmf =
+                TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        tmf.init(ks);
+        X509TrustManager defaultTrustManager = (X509TrustManager) tmf.getTrustManagers()[0];
+        SavingTrustManager tm = new SavingTrustManager(defaultTrustManager);
+        context.init(null, new TrustManager[]{tm}, null);
+        factory = context.getSocketFactory();
+
+        socket = (SSLSocket) factory.createSocket(hostname, 443);
+        try {
+            socket.startHandshake();
+        } catch (SSLException e) {
+            //we should get to here
+        }
+        X509Certificate[] chain = tm.chain;
+        if (chain == null) {
+            System.out.println("Could not obtain server certificate chain");
+            return;
+        }
+
+        X509Certificate cert = chain[0];
+        String alias = hostname;
+        ks.setCertificateEntry(alias, cert);
+
+        //System.out.println("copy this file to your jre/lib/security folder");
+        FileOutputStream fos = new FileOutputStream("paralleldotscacerts");
+        ks.store(fos, password);
+        fos.close();
+    }
+
+    public void similarity(String text1, String text2, String fileName, String folderName) {
+        try {
+            setUpCert("apis.paralleldots.com");
+
+            final String api_key = "K4m7Q6nEPuKGhpv8nN0X2X0cUScGNO1tpxDY3UoFjWw";
+            final String host = "https://apis.paralleldots.com/v3/similarity";
+            OkHttpClient client = new OkHttpClient.Builder()
+                                    .connectTimeout(30, TimeUnit.SECONDS)
+                                    .readTimeout(30, TimeUnit.SECONDS)
+                                    .writeTimeout(30, TimeUnit.SECONDS)
+                                    .build();
+            MediaType mediatype = MediaType.parse("multipart/form-data");
+            RequestBody body = RequestBody.create(mediatype, "");
+            Request request = (new Request.Builder()).url(host + "?api_key=" + api_key + "&text_1=" + text1 + "&text_2=" + text2).post(body).build();
+            Response response = client.newCall(request).execute();
+            final String similarity = response.body().string();
+            System.out.println(similarity);
+            Log.i("SIMILARITY", similarity);
+
+            final Task<DriveContents> createContentsTask = mDriveResourceClient.createContents();
+            Task<MetadataBuffer> folders = DriveUtils.getMetadataForFolder(folderName, mDriveResourceClient);
+
+            Tasks.whenAll(folders, createContentsTask).continueWithTask(task -> {
+                MetadataBuffer metadata = folders.getResult();
+                DriveFolder folder = DriveUtils.getDriveFolder(metadata, folderName);
+
+                DriveContents contents = createContentsTask.getResult();
+
+                metadata.release();
+
+                return DriveUtils.createText(contents, similarity + "\n\n" + text1 + "\n\n\n" + text2, fileName, folder, mDriveResourceClient);
+            })
+                    .addOnFailureListener(this, e -> {
+                        Log.e(TAG, "Unable to create file", e);
+                    });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 
     private void resetToSourceImage() {
@@ -406,96 +595,14 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mCropButtonsLayout.setVisibility(View.VISIBLE);
 
         mCropAcceptButton.setOnClickListener(v -> {
-            List<Bitmap> sourceImages = new ArrayList<>();
-            sourceImages.add(mSavedSource); // full image source
-
             Bitmap croppedBitmap = mCropImageView.getCroppedImage();
             Mat croppedMat = OpenCVUtils.createMat(croppedBitmap);
 
-            mIntermediateMat = croppedMat;
-
-            MatOfKeyPoint keypoint = new MatOfKeyPoint();
-            List<KeyPoint> listpoint;
-            KeyPoint kpoint;
-            Mat mask = Mat.zeros(croppedMat.size(), CvType.CV_8UC1);
-            int rectanx1, rectany1, rectanx2, rectany2;
-
-            List<MatOfPoint> contours = new ArrayList<>();
-            Mat kernel = Kernel.LARGE.generate();
-            Mat morbyte = new Mat();
-            Mat hierarchy = new Mat();
-
-            Rect rectan3;
-            //
-
-            if (mDetector == null) {
-                initDetector();
+            if (isTested) {
+                croppedMat = imagePostProcessing(croppedMat);
             }
 
-            mDetector.detect(croppedMat, keypoint);
-            listpoint = keypoint.toList();
-
-            for (int i = 0; i < listpoint.size(); i++) {
-                kpoint = listpoint.get(i);
-                rectanx1 = (int) (kpoint.pt.x - 0.5 * kpoint.size);
-                rectany1 = (int) (kpoint.pt.y - 0.5 * kpoint.size);
-                rectanx2 = (int) (kpoint.size);
-                rectany2 = (int) (kpoint.size);
-                if (rectanx1 <= 0)
-                    rectanx1 = 1;
-                if (rectany1 <= 0)
-                    rectany1 = 1;
-                if ((rectanx1 + rectanx2) > croppedMat.width())
-                    rectanx2 = croppedMat.width() - rectanx1;
-                if ((rectany1 + rectany2) > croppedMat.height())
-                    rectany2 = croppedMat.height() - rectany1;
-                Rect rectant = new Rect(rectanx1, rectany1, rectanx2, rectany2);
-                try {
-                    Mat roi = new Mat(mask, rectant);
-                    roi.setTo(CONTOUR_COLOR);
-                } catch (Exception ex) {
-                    Log.d(TAG, "mat roi error " + ex.getMessage());
-                }
-            }
-
-            Bitmap sourceMask = OpenCVUtils.createBitmap(mask);
-            sourceImages.add(sourceMask); // mask before dilation filter, but with detected contours
-
-            Imgproc.morphologyEx(mask, morbyte, Imgproc.MORPH_DILATE, kernel); // dilate filter
-
-            Bitmap sourceImage = OpenCVUtils.createBitmap(morbyte);
-            sourceImages.add(sourceImage); // mask after dilation filter
-
-            Imgproc.findContours(morbyte, contours, hierarchy,
-                    Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
-
-            Collections.reverse(contours);
-
-            List<Bitmap> bitmapsToRecognize = new ArrayList<>();
-
-            for (int ind = 0; ind < contours.size(); ind++) {
-                rectan3 = Imgproc.boundingRect(contours.get(ind));
-                Imgproc.rectangle(croppedMat, rectan3.br(), rectan3.tl(),
-                        CONTOUR_COLOR);
-                Bitmap bmp = null;
-                try {
-                    Mat croppedPart;
-                    croppedPart = mIntermediateMat.submat(rectan3);
-                    bmp = OpenCVUtils.createBitmap(croppedPart);
-                } catch (Exception e) {
-                    Log.d(TAG, "cropped part data error " + e.getMessage());
-                }
-                if (bmp != null) {
-                    bitmapsToRecognize.add(bmp);
-                }
-            }
-
-            Bitmap sourceCropped = OpenCVUtils.createBitmap(croppedMat);
-            sourceImages.add(sourceCropped);
-
-            BitmapResults results = new BitmapResults(bitmapsToRecognize, sourceImages);
-
-            processBitmapResults(results);
+            recognizeMat(croppedMat);
         });
 
         mCropBackButton.setOnClickListener(v -> resetToInitial());
@@ -527,6 +634,96 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             mOpenCVCameraView.disableView();
             mOpenCVCameraView.setVisibility(View.GONE);
         }
+    }
+
+    private void recognizeMat(Mat mat) {
+        List<Bitmap> sourceImages = new ArrayList<>();
+        sourceImages.add(mSavedSource); // full image source
+
+        mIntermediateMat = mat;
+
+        MatOfKeyPoint keypoint = new MatOfKeyPoint();
+        List<KeyPoint> listpoint;
+        KeyPoint kpoint;
+        Mat mask = Mat.zeros(mat.size(), CvType.CV_8UC1);
+        int rectanx1, rectany1, rectanx2, rectany2;
+
+        List<MatOfPoint> contours = new ArrayList<>();
+        Mat kernel = Kernel.LARGE.generate();
+        Mat morbyte = new Mat();
+        Mat hierarchy = new Mat();
+
+        Rect rectan3;
+        //
+
+        if (mDetector == null) {
+            initDetector();
+        }
+
+        mDetector.detect(mat, keypoint);
+        listpoint = keypoint.toList();
+
+        for (int i = 0; i < listpoint.size(); i++) {
+            kpoint = listpoint.get(i);
+            rectanx1 = (int) (kpoint.pt.x - 0.5 * kpoint.size);
+            rectany1 = (int) (kpoint.pt.y - 0.5 * kpoint.size);
+            rectanx2 = (int) (kpoint.size);
+            rectany2 = (int) (kpoint.size);
+            if (rectanx1 <= 0)
+                rectanx1 = 1;
+            if (rectany1 <= 0)
+                rectany1 = 1;
+            if ((rectanx1 + rectanx2) > mat.width())
+                rectanx2 = mat.width() - rectanx1;
+            if ((rectany1 + rectany2) > mat.height())
+                rectany2 = mat.height() - rectany1;
+            Rect rectant = new Rect(rectanx1, rectany1, rectanx2, rectany2);
+            try {
+                Mat roi = new Mat(mask, rectant);
+                roi.setTo(CONTOUR_COLOR);
+            } catch (Exception ex) {
+                Log.d(TAG, "mat roi error " + ex.getMessage());
+            }
+        }
+
+        Bitmap sourceMask = OpenCVUtils.createBitmap(mask);
+        sourceImages.add(sourceMask); // mask before dilation filter, but with detected contours
+
+        Imgproc.morphologyEx(mask, morbyte, Imgproc.MORPH_DILATE, kernel); // dilate filter
+
+        Bitmap sourceImage = OpenCVUtils.createBitmap(morbyte);
+        sourceImages.add(sourceImage); // mask after dilation filter
+
+        Imgproc.findContours(morbyte, contours, hierarchy,
+                Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
+
+        Collections.reverse(contours);
+
+        List<Bitmap> bitmapsToRecognize = new ArrayList<>();
+
+        for (int ind = 0; ind < contours.size(); ind++) {
+            rectan3 = Imgproc.boundingRect(contours.get(ind));
+            Imgproc.rectangle(mat, rectan3.br(), rectan3.tl(),
+                    CONTOUR_COLOR);
+            Bitmap bmp = null;
+            try {
+                Mat croppedPart;
+                croppedPart = mIntermediateMat.submat(rectan3);
+                bmp = OpenCVUtils.createBitmap(croppedPart);
+            } catch (Exception e) {
+                Log.d(TAG, "cropped part data error " + e.getMessage());
+            }
+            if (bmp != null) {
+                bitmapsToRecognize.add(bmp);
+            }
+        }
+
+        Bitmap sourceCropped = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceCropped);
+
+        BitmapResults results = new BitmapResults(bitmapsToRecognize, sourceImages);
+
+        processBitmapResults(results);
     }
 
     private Mat clearNoise(Mat mat) {
@@ -701,7 +898,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     public void uploadBitmapsToGoogleDrive(List<BitmapRegion> regions, List<Bitmap> sourceBitmaps) {
         String timeStamp = Utils.getCurrentTimestamp();
-        final String folderName = timeStamp + " openCV";
+        folderName = timeStamp + " openCV";
 
         Task<DriveFolder> folderTask = DriveUtils.createFolder(folderName, mDriveResourceClient);
         folderTask.continueWith(task -> {

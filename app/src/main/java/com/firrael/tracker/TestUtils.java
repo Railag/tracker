@@ -1,13 +1,16 @@
 package com.firrael.tracker;
 
+import android.content.Context;
 import android.os.Environment;
 import android.util.Log;
 
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
-import org.opencv.imgproc.Imgproc;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 
 /**
  * Created by railag on 21.02.2018.
@@ -40,7 +43,7 @@ public class TestUtils {
         String filename = file.toString();
         Mat mat = Imgcodecs.imread(filename, 0);
         //    if (Core.countNonZero(mat) != 0) { // non-empty matrix (and not 0x0 matrix) -> turn to white-black channel
-    //    Imgproc.cvtColor(mat, mat, Imgproc.COLOR_BGR2GRAY);
+        //    Imgproc.cvtColor(mat, mat, Imgproc.COLOR_BGR2GRAY);
         //    }
         return mat;
     }
@@ -50,6 +53,33 @@ public class TestUtils {
         path.mkdirs();
         File file = new File(path, TEST_IMAGE);
         file.delete();
+    }
+
+    public static String readTextFile(Context context, String filename) {
+        BufferedReader reader = null;
+        StringBuilder builder = new StringBuilder();
+        try {
+            reader = new BufferedReader(
+                    new InputStreamReader(context.getAssets().open(filename)));
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(line);
+            }
+            return builder.toString();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        return builder.toString();
     }
 
 }

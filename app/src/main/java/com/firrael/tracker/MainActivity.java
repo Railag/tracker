@@ -2,6 +2,7 @@ package com.firrael.tracker;
 
 import android.app.Fragment;
 import android.app.FragmentTransaction;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -26,6 +27,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
+import com.firrael.tracker.openCV.OpenCVActivity;
 import com.firrael.tracker.realm.TaskModel;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -232,6 +234,12 @@ public class MainActivity extends AppCompatActivity
         setFragment(LandingTaskFragment.newInstance());
     }
 
+    public void toOpenCVTest(Context context) {
+        Intent intent = new Intent(context, OpenCVActivity.class);
+        intent.putExtra(OpenCVActivity.KEY_TEST, true);
+        startActivity(intent);
+    }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle action bar item clicks here. The action bar will
@@ -262,6 +270,8 @@ public class MainActivity extends AppCompatActivity
             shareApp();
         } else if (id == R.id.nav_backup) {
             toBackup();
+        } else if (id == R.id.nav_test) {
+            toOpenCVTest(this);
         }
 
         DrawerLayout drawer = findViewById(R.id.drawer_layout);

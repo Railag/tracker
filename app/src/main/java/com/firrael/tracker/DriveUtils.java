@@ -21,7 +21,9 @@ import com.google.android.gms.drive.query.Query;
 import com.google.android.gms.drive.query.SearchableField;
 import com.google.android.gms.tasks.Task;
 
+import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 
 /**
  * Created by railag on 18.01.2018.
@@ -57,6 +59,22 @@ public class DriveUtils {
         MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
                 .setTitle(name)
                 .setMimeType("image/jpeg")
+                .build();
+
+        return driveClient.createFile(driveFolder, changeSet, contents);
+    }
+
+    public static Task<DriveFile> createText(DriveContents contents, String text, String name, DriveFolder driveFolder, DriveResourceClient driveClient) {
+        OutputStream outputStream = contents.getOutputStream();
+        try {
+            outputStream.write(text.getBytes(Charset.forName("UTF-8")));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
+                .setTitle(name)
+                .setMimeType("text/plain")
                 .build();
 
         return driveClient.createFile(driveFolder, changeSet, contents);
