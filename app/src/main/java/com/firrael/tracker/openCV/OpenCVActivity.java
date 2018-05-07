@@ -122,6 +122,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     };
 
     private boolean isTested;
+    private int testPhase = 0;
     private String folderName;
     private String mCurrentTimeStamp;
 
@@ -190,10 +191,11 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private void test() {
         int resourceId = R.drawable.test_ocr_image;
+        Mat sourceMat = null;
         try {
             Bitmap bmp = BitmapFactory.decodeResource(getResources(), resourceId);
 
-            Mat sourceMat = OpenCVUtils.createMat(bmp);
+            sourceMat = OpenCVUtils.createMat(bmp);
 
             if (Core.countNonZero(sourceMat) != 0) { // non-empty matrix (and not 0x0 matrix)
                 mSavedSource = OpenCVUtils.createBitmap(imagePostProcessing(sourceMat));
@@ -201,14 +203,31 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                 sourceMat = clearNoise(sourceMat);
 
                 sourceMat = OpenCVUtils.createMat(textSkew(sourceMat));
-
-                recognizeMat(sourceMat);
             }
         } catch (OutOfMemoryError e) {
             e.printStackTrace();
             finish();
         }
 
+
+        switch (testPhase) {
+            case 1:
+                Mat sourceMatClose = close(sourceMat);
+                recognizeMat(sourceMatClose);
+                break;
+            case 2:
+                Mat sourceMatErode = erode(sourceMat);
+                recognizeMat(sourceMatErode);
+                break;
+            default:
+            case 0:
+                if (sourceMat != null) {
+                    recognizeMat(sourceMat);
+                }
+                break;
+        }
+
+        testPhase++;
     }
 
     private void initializeLanguage() {
@@ -462,7 +481,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(aVoid -> {
                         }, this::onError,
-                        () -> Log.i(TAG, "Similarity uploaded to Google Drive."));
+                        () -> {
+                            Log.i(TAG, "Similarity uploaded to Google Drive.");
+                            test();
+                        });
     }
 
     private void resetToSourceImage() {
@@ -635,6 +657,18 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
 
         mCurrentNoiseKernel.increase();
+        return mat;
+    }
+
+    private Mat close(Mat mat) {
+        Mat kernel = Kernel.TINY.generate();
+        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
+        return mat;
+    }
+
+    private Mat erode(Mat mat) {
+        Mat kernel = Kernel.TINY.generate();
+        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_ERODE, kernel);
         return mat;
     }
 
