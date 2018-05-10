@@ -37,6 +37,7 @@ import okhttp3.Response;
  */
 public class ParallelDotsHelper {
     private static final String TAG = ParallelDotsHelper.class.getSimpleName();
+    private static boolean initialized;
 
 
     private static class SavingTrustManager implements X509TrustManager {
@@ -66,6 +67,10 @@ public class ParallelDotsHelper {
     }
 
     private static void setUpCert() throws Exception {
+        if (initialized) {
+            return;
+        }
+
         SSLSocketFactory factory = HttpsURLConnection.getDefaultSSLSocketFactory();
 
         SSLSocket socket = (SSLSocket) factory.createSocket("apis.paralleldots.com", 443);
@@ -112,9 +117,11 @@ public class ParallelDotsHelper {
         FileOutputStream fos = new FileOutputStream("paralleldotscacerts");
         ks.store(fos, password);
         fos.close();
+
+        initialized = true;
     }
 
-    public static void findDiff(Activity activity, String text1, String text2, String fileName, String folderName, DriveResourceClient driveResourceClient) {
+    public static String findDiff(Activity activity, String text1, String text2, String fileName, String folderName, DriveResourceClient driveResourceClient) {
         try {
             setUpCert();
 
@@ -130,7 +137,6 @@ public class ParallelDotsHelper {
             Request request = (new Request.Builder()).url(host + "?api_key=" + api_key + "&text_1=" + text1 + "&text_2=" + text2).post(body).build();
             Response response = client.newCall(request).execute();
             final String similarity = response.body().string();
-            System.out.println(similarity);
             Log.i("SIMILARITY", similarity);
 
             final Task<DriveContents> createContentsTask = driveResourceClient.createContents();
@@ -149,9 +155,11 @@ public class ParallelDotsHelper {
                     .addOnFailureListener(activity, e -> {
                         Log.e(TAG, "Unable to create file", e);
                     });
+            return similarity;
         } catch (Exception e) {
             e.printStackTrace();
         }
 
+        return "";
     }
 }

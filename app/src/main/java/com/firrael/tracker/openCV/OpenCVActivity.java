@@ -7,6 +7,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
@@ -79,6 +80,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private final static Scalar CONTOUR_COLOR = Scalar.all(100);
 
+    private Handler handler = new Handler();
+
     private FocusCameraView mOpenCVCameraView;
     private CropImageView mCropImageView;
     private ImageButton mCropAcceptButton;
@@ -106,10 +109,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                         initDetector();
                     }
 
-                    if (!isTested) {
+                    if (!isTest) {
                         mOpenCVCameraView.enableView();
                     } else {
-                        test();
+                        handler.post(runTest);
                     }
                 }
                 break;
@@ -121,13 +124,15 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
     };
 
-    private boolean isTested;
+    private boolean isTest;
     private int testPhase = 0;
     private String folderName;
     private String mCurrentTimeStamp;
+    private ArrayList<String> similarities = new ArrayList<>();
 
     private ArrayList<Bitmap> mCurrentSourceBitmaps = new ArrayList<>();
     private ArrayList<BitmapRegion> mCurrentBitmapRegions = new ArrayList<>();
+    private int optimalRegionsNumber;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -185,7 +190,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         Intent intent = getIntent();
         if (intent.hasExtra(KEY_TEST)) {
-            isTested = true;
+            isTest = true;
         }
     }
 
@@ -206,28 +211,95 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             }
         } catch (OutOfMemoryError e) {
             e.printStackTrace();
-            finish();
         }
 
 
         switch (testPhase) {
-            case 1:
-                Mat sourceMatClose = close(sourceMat);
-                recognizeMat(sourceMatClose);
-                break;
-            case 2:
-                Mat sourceMatErode = erode(sourceMat);
-                recognizeMat(sourceMatErode);
-                break;
-            default:
             case 0:
                 if (sourceMat != null) {
                     recognizeMat(sourceMat);
                 }
                 break;
+            case 1:
+                sourceMat = dilate(sourceMat);
+                recognizeMat(sourceMat);
+                break;
+            case 2:
+                sourceMat = erode(sourceMat);
+                recognizeMat(sourceMat);
+                break;
+            case 3:
+                sourceMat = close(sourceMat);
+                recognizeMat(sourceMat);
+                break;
+            case 4:
+                sourceMat = open(sourceMat);
+                recognizeMat(sourceMat);
+                break;
+            case 5:
+                uploadSimilaritiesResults();
+                break;
+            default:
+                break;
         }
+    }
 
-        testPhase++;
+    private String getTestFolderPrefix() {
+        switch(testPhase) {
+            case 0:
+                return "base";
+            case 1:
+                return "dilate";
+            case 2:
+                return "erode";
+            case 3:
+                return "close";
+            case 4:
+                return "open";
+            case 5:
+                return "results";
+            default:
+                return "error";
+        }
+    }
+
+
+    private void uploadSimilaritiesResults() {
+        if (TextUtils.isEmpty(mCurrentTimeStamp)) {
+            mCurrentTimeStamp = Utils.getCurrentTimestamp();
+
+            folderName = getTestFolderPrefix() + mCurrentTimeStamp + " openCV";
+
+            Task<DriveFolder> folderTask = DriveUtils.createFolder(folderName, mDriveResourceClient);
+            folderTask.continueWith(task -> {
+                DriveFolder parentFolder = folderTask.getResult();
+
+                final Task<DriveContents> createContentsTask = mDriveResourceClient.createContents();
+                Task<MetadataBuffer> folders = DriveUtils.getMetadataForFolder(folderName, mDriveResourceClient);
+
+                Tasks.whenAll(folders, createContentsTask).continueWithTask(task2 -> {
+                    MetadataBuffer metadata = folders.getResult();
+                    DriveFolder folder = DriveUtils.getDriveFolder(metadata, folderName);
+
+                    DriveContents contents = createContentsTask.getResult();
+
+                    metadata.release();
+
+                    StringBuilder builder = new StringBuilder();
+                    for (String s : similarities) {
+                        builder.append(s);
+                        builder.append("\n");
+                    }
+
+                    Log.i(TAG, "Finished similarity results upload.");
+
+                    return DriveUtils.createText(contents, builder.toString(), "results", folder, mDriveResourceClient);
+                })
+                        .addOnFailureListener(this, e -> Log.e(TAG, "Unable to create file", e));
+
+                return null;
+            });
+        }
     }
 
     private void initializeLanguage() {
@@ -329,6 +401,11 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             }
             mTesseract.onDestroy();
         }
+
+        if (handler != null) {
+            handler.removeCallbacks(runTest);
+            handler = null;
+        }
     }
 
     public void onCameraViewStarted(int width, int height) {
@@ -369,7 +446,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         dialog.show();
 
         Observable.create((Action1<Emitter<Void>>) emitter -> {
-            uploadBitmapsToGoogleDrive(regions, bitmapResults.getSourceBitmaps());
+            addBitmapsToNextUploading(regions, bitmapResults.getSourceBitmaps());
+            uploadAllBitmaps();
             emitter.onCompleted();
         }, Emitter.BackpressureMode.LATEST)
                 .subscribeOn(Schedulers.newThread())
@@ -421,13 +499,19 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private void resetCurrentDriveData() {
         mCurrentTimeStamp = null;
+/*        for (BitmapRegion region : mCurrentBitmapRegions) {
+            region.getBitmap().recycle();
+        }
+        for (Bitmap bitmap : mCurrentSourceBitmaps) {
+            bitmap.recycle();
+        }*/
         mCurrentBitmapRegions = new ArrayList<>();
         mCurrentSourceBitmaps = new ArrayList<>();
     }
 
     private void showResults(ArrayList<RecognizedRegion> results) {
 
-        if (isTested) {
+        if (isTest) {
             StringBuilder builder = new StringBuilder();
             for (int i = 0; i < results.size(); i++) {
                 RecognizedRegion line = results.get(i);
@@ -471,7 +555,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         Observable.create((Action1<Emitter<String>>) emitter -> {
             try {
-                ParallelDotsHelper.findDiff(this, sourceText, recognizedText, fileName, folderName, mDriveResourceClient);
+                String similarity = ParallelDotsHelper.findDiff(this, sourceText, recognizedText, fileName, folderName, mDriveResourceClient);
+                if (!TextUtils.isEmpty(similarity)) {
+                    similarities.add(similarity);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -483,9 +570,14 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                         }, this::onError,
                         () -> {
                             Log.i(TAG, "Similarity uploaded to Google Drive.");
-                            test();
+                            testPhase++;
+                            handler.post(runTest);
                         });
     }
+
+    Runnable runTest = () -> {
+        test();
+    };
 
     private void resetToSourceImage() {
         detectRegions(false);
@@ -519,7 +611,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             Bitmap croppedBitmap = mCropImageView.getCroppedImage();
             Mat croppedMat = OpenCVUtils.createMat(croppedBitmap);
 
-            if (isTested) {
+            if (isTest) {
                 croppedMat = imagePostProcessing(croppedMat);
             }
 
@@ -559,7 +651,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private void recognizeMat(Mat mat) {
         List<Bitmap> sourceImages = new ArrayList<>();
-        sourceImages.add(mSavedSource); // full image source
+        sourceImages.add(mSavedSource); // full image source*/
 
         mIntermediateMat = mat;
 
@@ -607,18 +699,25 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             }
         }
 
-        Bitmap sourceMask = OpenCVUtils.createBitmap(mask);
-        sourceImages.add(sourceMask); // mask before dilation filter, but with detected contours
+     /*   Bitmap sourceMask = OpenCVUtils.createBitmap(mask);
+        sourceImages.add(sourceMask); // mask before dilation filter, but with detected contours*/
 
         Imgproc.morphologyEx(mask, morbyte, Imgproc.MORPH_DILATE, kernel); // dilate filter
 
-        Bitmap sourceImage = OpenCVUtils.createBitmap(morbyte);
-        sourceImages.add(sourceImage); // mask after dilation filter
+/*        Bitmap sourceImage = OpenCVUtils.createBitmap(morbyte);
+        sourceImages.add(sourceImage); // mask after dilation filter*/
 
         Imgproc.findContours(morbyte, contours, hierarchy,
                 Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
 
         Collections.reverse(contours);
+
+        if (isTest && contours.size() > optimalRegionsNumber && optimalRegionsNumber != 0) {
+            resetCurrentDriveData();
+            testPhase++;
+            handler.post(runTest);
+            return;
+        }
 
         List<Bitmap> bitmapsToRecognize = new ArrayList<>();
 
@@ -639,8 +738,12 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             }
         }
 
-        Bitmap sourceCropped = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceCropped);
+        if (isTest && optimalRegionsNumber == 0) {
+            optimalRegionsNumber = bitmapsToRecognize.size();
+        }
+
+/*        Bitmap sourceCropped = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceCropped);*/
 
         BitmapResults results = new BitmapResults(bitmapsToRecognize, sourceImages);
 
@@ -660,15 +763,27 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         return mat;
     }
 
-    private Mat close(Mat mat) {
+    private Mat dilate(Mat mat) {
         Mat kernel = Kernel.TINY.generate();
-        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
+        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_DILATE, kernel);
         return mat;
     }
 
     private Mat erode(Mat mat) {
         Mat kernel = Kernel.TINY.generate();
         Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_ERODE, kernel);
+        return mat;
+    }
+
+    private Mat close(Mat mat) {
+        Mat kernel = Kernel.TINY.generate();
+        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
+        return mat;
+    }
+
+    private Mat open(Mat mat) {
+        Mat kernel = Kernel.TINY.generate();
+        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_OPEN, kernel);
         return mat;
     }
 
@@ -697,19 +812,19 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         List<Bitmap> sourceImages = new ArrayList<>();
 
-        Bitmap sourceImage = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceImage);
+/*        Bitmap sourceImage = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceImage);*/
 
         //Imgproc.GaussianBlur(mat, mat, new Size(3, 3), 0); // TODO gaussian -> median?
         Imgproc.medianBlur(mat, mat, 3);
 
-        sourceImage = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceImage);
+/*        sourceImage = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceImage);*/
 
         Imgproc.adaptiveThreshold(mat, mat, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 5, 4);
 
-        sourceImage = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceImage);
+/*        sourceImage = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceImage);*/
 
    /*     Mat kernel = Kernel.TINY.generate();
         Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
@@ -721,15 +836,15 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         Mat erodeKernel = Kernel.TINY.generate();
         Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_ERODE, erodeKernel);
 */
-        sourceImage = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceImage);
+/*        sourceImage = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceImage);*/
 
         Imgproc.threshold(mat, mat, 0, 255, Imgproc.THRESH_OTSU);
 
-        sourceImage = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceImage);
+/*        sourceImage = OpenCVUtils.createBitmap(mat);
+        sourceImages.add(sourceImage);*/
 
-        uploadBitmapsToGoogleDrive(new ArrayList<>(), sourceImages);
+        addBitmapsToNextUploading(new ArrayList<>(), sourceImages);
 
         //    Imgproc.adaptiveThreshold(tmp, tmp, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
         return mat;
@@ -749,28 +864,28 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         Imgproc.adaptiveThreshold(greyscale, greyscale, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
         //Imgproc.threshold(greyscale, greyscale, 200, 255, Imgproc.THRESH_BINARY);
 
-        Bitmap sourceThreshold = OpenCVUtils.createBitmap(greyscale);
-        sourceImages.add(sourceThreshold);
+/*        Bitmap sourceThreshold = OpenCVUtils.createBitmap(greyscale);
+        sourceImages.add(sourceThreshold);*/
 
         //Invert the colors (because objects are represented as white pixels, and the background is represented by black pixels)
         Core.bitwise_not(greyscale, greyscale);
         Mat element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(3, 3));
 
-        Bitmap sourceElement = OpenCVUtils.createBitmap(element);
-        sourceImages.add(sourceElement);
+/*        Bitmap sourceElement = OpenCVUtils.createBitmap(element);
+        sourceImages.add(sourceElement);*/
 
         //We can now perform our erosion, we must declare our rectangle-shaped structuring element and call the erode function
         Imgproc.erode(greyscale, greyscale, element);
 
-        Bitmap sourceErodedGreyscale = OpenCVUtils.createBitmap(greyscale);
-        sourceImages.add(sourceErodedGreyscale);
+/*        Bitmap sourceErodedGreyscale = OpenCVUtils.createBitmap(greyscale);
+        sourceImages.add(sourceErodedGreyscale);*/
 
         //Find all white pixels
         Mat wLocMat = Mat.zeros(greyscale.size(), greyscale.type());
         Core.findNonZero(greyscale, wLocMat);
 
-        Bitmap sourceLockMat = OpenCVUtils.createBitmap(greyscale);
-        sourceImages.add(sourceLockMat);
+/*        Bitmap sourceLockMat = OpenCVUtils.createBitmap(greyscale);
+        sourceImages.add(sourceLockMat);*/
 
         //Create an empty Mat and pass it to the function
         MatOfPoint matOfPoint = new MatOfPoint(wLocMat);
@@ -789,8 +904,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             boxContours.add(new MatOfPoint(vertices));
             Imgproc.drawContours(greyscale, boxContours, 0, new Scalar(128, 128, 128), -1);
 
-            Bitmap sourceGreyscale = OpenCVUtils.createBitmap(greyscale);
-            sourceImages.add(sourceGreyscale);
+/*            Bitmap sourceGreyscale = OpenCVUtils.createBitmap(greyscale);
+            sourceImages.add(sourceGreyscale);*/
 
             // always landscape orientation!
             rotatedRect.angle = rotatedRect.angle < -45 ? rotatedRect.angle + 90.f : rotatedRect.angle;
@@ -801,7 +916,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             Bitmap bitmap = OpenCVUtils.createBitmap(result);
             sourceImages.add(bitmap);
 
-            uploadBitmapsToGoogleDrive(new ArrayList<>(), sourceImages);
+            addBitmapsToNextUploading(new ArrayList<>(), sourceImages);
 
             return bitmap;
         } catch (Exception e) {
@@ -834,17 +949,23 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         Log.i(TAG, "onCameraViewStopped called");
     }
 
-    public void uploadBitmapsToGoogleDrive(List<BitmapRegion> regions, List<Bitmap> sourceBitmaps) {
+    public void addBitmapsToNextUploading(List<BitmapRegion> regions, List<Bitmap> sourceBitmaps) {
         mCurrentBitmapRegions.addAll(regions);
 
         if (sourceBitmaps != null && sourceBitmaps.size() > 0) {
             mCurrentSourceBitmaps.addAll(sourceBitmaps);
         }
+    }
 
+    public void uploadAllBitmaps() {
         if (TextUtils.isEmpty(mCurrentTimeStamp)) {
             mCurrentTimeStamp = Utils.getCurrentTimestamp();
 
-            folderName = mCurrentTimeStamp + " openCV";
+            if (isTest) {
+                folderName = getTestFolderPrefix() +  " " + mCurrentTimeStamp + " openCV";
+            } else {
+                folderName = mCurrentTimeStamp + " openCV";
+            }
 
             Task<DriveFolder> folderTask = DriveUtils.createFolder(folderName, mDriveResourceClient);
             folderTask.continueWith(task -> {
@@ -865,7 +986,6 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             });
         }
     }
-
 
     private void addGoogleDriveImage(Bitmap image, String name, String folderName) {
         final Task<DriveContents> createContentsTask = mDriveResourceClient.createContents();
