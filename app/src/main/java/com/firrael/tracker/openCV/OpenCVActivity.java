@@ -110,8 +110,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                     }
 
                     if (!isTest) {
+                        mOpenCVCameraView.setVisibility(View.VISIBLE);
                         mOpenCVCameraView.enableView();
                     } else {
+                        mOpenCVCameraView.setVisibility(View.GONE);
                         handler.post(runTest);
                     }
                 }
@@ -195,7 +197,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     private void test() {
-        int resourceId = R.drawable.test_ocr_image;
+        int resourceId = R.drawable.ocr_test_3; //R.drawable.test_ocr_image;
         Mat sourceMat = null;
         try {
             Bitmap bmp = BitmapFactory.decodeResource(getResources(), resourceId);
@@ -216,27 +218,33 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         switch (testPhase) {
             case 0:
+                Snackbar.make(mCropImageView, getMessageForTestStep(0), Snackbar.LENGTH_SHORT).show();
                 if (sourceMat != null) {
                     recognizeMat(sourceMat);
                 }
                 break;
             case 1:
+                Snackbar.make(mCropImageView, getMessageForTestStep(1), Snackbar.LENGTH_SHORT).show();
                 sourceMat = dilate(sourceMat);
                 recognizeMat(sourceMat);
                 break;
             case 2:
+                Snackbar.make(mCropImageView, getMessageForTestStep(2), Snackbar.LENGTH_SHORT).show();
                 sourceMat = erode(sourceMat);
                 recognizeMat(sourceMat);
                 break;
             case 3:
+                Snackbar.make(mCropImageView, getMessageForTestStep(3), Snackbar.LENGTH_SHORT).show();
                 sourceMat = close(sourceMat);
                 recognizeMat(sourceMat);
                 break;
             case 4:
+                Snackbar.make(mCropImageView, getMessageForTestStep(4), Snackbar.LENGTH_SHORT).show();
                 sourceMat = open(sourceMat);
                 recognizeMat(sourceMat);
                 break;
             case 5:
+                Snackbar.make(mCropImageView, getMessageForTestStep(5), Snackbar.LENGTH_SHORT).show();
                 uploadSimilaritiesResults();
                 break;
             default:
@@ -244,8 +252,12 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
     }
 
+    private String getMessageForTestStep(int step) {
+        return "Test step " + step + ": " + getTestFolderPrefix();
+    }
+
     private String getTestFolderPrefix() {
-        switch(testPhase) {
+        switch (testPhase) {
             case 0:
                 return "base";
             case 1:
@@ -291,11 +303,12 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                         builder.append("\n");
                     }
 
-                    Log.i(TAG, "Finished similarity results upload.");
 
                     return DriveUtils.createText(contents, builder.toString(), "results", folder, mDriveResourceClient);
-                })
-                        .addOnFailureListener(this, e -> Log.e(TAG, "Unable to create file", e));
+                }).addOnCompleteListener(this, task1 -> {
+                    Log.i(TAG, "Finished similarity results upload.");
+                    finish();
+                }).addOnFailureListener(this, e -> Log.e(TAG, "Unable to create file", e));
 
                 return null;
             });
@@ -551,7 +564,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     private void uploadDiffToGoogleDrive(String recognizedText, String folderName, String fileName) {
-        String sourceText = TestUtils.readTextFile(this, "test_ocr_text");
+        String sourceText = TestUtils.readTextFile(this, "test_ocr_text_2");
 
         Observable.create((Action1<Emitter<String>>) emitter -> {
             try {
@@ -962,7 +975,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             mCurrentTimeStamp = Utils.getCurrentTimestamp();
 
             if (isTest) {
-                folderName = getTestFolderPrefix() +  " " + mCurrentTimeStamp + " openCV";
+                folderName = getTestFolderPrefix() + " " + mCurrentTimeStamp + " openCV";
             } else {
                 folderName = mCurrentTimeStamp + " openCV";
             }

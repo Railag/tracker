@@ -10,6 +10,7 @@ import org.opencv.core.Scalar;
 
 public enum Kernel {
 
+    ONE(1),
     TINY(2),
     SMALL(3),
     MEDIUM(10),
