@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.annotation.Nullable;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
@@ -40,9 +41,7 @@ import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
-import org.opencv.core.KeyPoint;
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
@@ -78,7 +77,9 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     public final static String KEY_SCAN_RESULTS = "scanResults";
     public final static String KEY_TEST = "test";
 
-    private final static Scalar CONTOUR_COLOR = Scalar.all(100);
+    public final static Scalar CONTOUR_COLOR = Scalar.all(100);
+
+    private final static int MAX_OPTIMAL_REGIONS = 100;
 
     private Handler handler = new Handler();
 
@@ -132,7 +133,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     private String mCurrentTimeStamp;
     private ArrayList<String> similarities = new ArrayList<>();
 
-    private ArrayList<Bitmap> mCurrentSourceBitmaps = new ArrayList<>();
+    private ArrayList<SourceBitmap> mCurrentSourceBitmaps = new ArrayList<>();
     private ArrayList<BitmapRegion> mCurrentBitmapRegions = new ArrayList<>();
     private int optimalRegionsNumber;
 
@@ -144,7 +145,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         mSubscription = new CompositeSubscription();
 
-        initializeLanguage();
+        mLanguage = Utils.getLanguage(this);
 
         Window window = getWindow();
 
@@ -196,134 +197,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
     }
 
-    private void test() {
-        int resourceId = R.drawable.ocr_test_3; //R.drawable.test_ocr_image;
-        Mat sourceMat = null;
-        try {
-            Bitmap bmp = BitmapFactory.decodeResource(getResources(), resourceId);
-
-            sourceMat = OpenCVUtils.createMat(bmp);
-
-            if (Core.countNonZero(sourceMat) != 0) { // non-empty matrix (and not 0x0 matrix)
-                mSavedSource = OpenCVUtils.createBitmap(imagePostProcessing(sourceMat));
-
-                sourceMat = clearNoise(sourceMat);
-
-                sourceMat = OpenCVUtils.createMat(textSkew(sourceMat));
-            }
-        } catch (OutOfMemoryError e) {
-            e.printStackTrace();
-        }
-
-
-        switch (testPhase) {
-            case 0:
-                Snackbar.make(mCropImageView, getMessageForTestStep(0), Snackbar.LENGTH_SHORT).show();
-                if (sourceMat != null) {
-                    recognizeMat(sourceMat);
-                }
-                break;
-            case 1:
-                Snackbar.make(mCropImageView, getMessageForTestStep(1), Snackbar.LENGTH_SHORT).show();
-                sourceMat = dilate(sourceMat);
-                recognizeMat(sourceMat);
-                break;
-            case 2:
-                Snackbar.make(mCropImageView, getMessageForTestStep(2), Snackbar.LENGTH_SHORT).show();
-                sourceMat = erode(sourceMat);
-                recognizeMat(sourceMat);
-                break;
-            case 3:
-                Snackbar.make(mCropImageView, getMessageForTestStep(3), Snackbar.LENGTH_SHORT).show();
-                sourceMat = close(sourceMat);
-                recognizeMat(sourceMat);
-                break;
-            case 4:
-                Snackbar.make(mCropImageView, getMessageForTestStep(4), Snackbar.LENGTH_SHORT).show();
-                sourceMat = open(sourceMat);
-                recognizeMat(sourceMat);
-                break;
-            case 5:
-                Snackbar.make(mCropImageView, getMessageForTestStep(5), Snackbar.LENGTH_SHORT).show();
-                uploadSimilaritiesResults();
-                break;
-            default:
-                break;
-        }
-    }
-
-    private String getMessageForTestStep(int step) {
-        return "Test step " + step + ": " + getTestFolderPrefix();
-    }
-
-    private String getTestFolderPrefix() {
-        switch (testPhase) {
-            case 0:
-                return "base";
-            case 1:
-                return "dilate";
-            case 2:
-                return "erode";
-            case 3:
-                return "close";
-            case 4:
-                return "open";
-            case 5:
-                return "results";
-            default:
-                return "error";
-        }
-    }
-
-
-    private void uploadSimilaritiesResults() {
-        if (TextUtils.isEmpty(mCurrentTimeStamp)) {
-            mCurrentTimeStamp = Utils.getCurrentTimestamp();
-
-            folderName = getTestFolderPrefix() + mCurrentTimeStamp + " openCV";
-
-            Task<DriveFolder> folderTask = DriveUtils.createFolder(folderName, mDriveResourceClient);
-            folderTask.continueWith(task -> {
-                DriveFolder parentFolder = folderTask.getResult();
-
-                final Task<DriveContents> createContentsTask = mDriveResourceClient.createContents();
-                Task<MetadataBuffer> folders = DriveUtils.getMetadataForFolder(folderName, mDriveResourceClient);
-
-                Tasks.whenAll(folders, createContentsTask).continueWithTask(task2 -> {
-                    MetadataBuffer metadata = folders.getResult();
-                    DriveFolder folder = DriveUtils.getDriveFolder(metadata, folderName);
-
-                    DriveContents contents = createContentsTask.getResult();
-
-                    metadata.release();
-
-                    StringBuilder builder = new StringBuilder();
-                    for (String s : similarities) {
-                        builder.append(s);
-                        builder.append("\n");
-                    }
-
-
-                    return DriveUtils.createText(contents, builder.toString(), "results", folder, mDriveResourceClient);
-                }).addOnCompleteListener(this, task1 -> {
-                    Log.i(TAG, "Finished similarity results upload.");
-                    finish();
-                }).addOnFailureListener(this, e -> Log.e(TAG, "Unable to create file", e));
-
-                return null;
-            });
-        }
-    }
-
-    private void initializeLanguage() {
-        mLanguage = Utils.getLanguage(this);
-    }
-
     private void initializeTesseract() {
         mTesseract = new Tesseract(this, mLanguage);
 
         mTesseractCounter = 0;
-
 
         mSubscription.add(Observable
                 .range(0, Tesseract.WORKER_POOL_SIZE)
@@ -337,7 +214,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                     });*/
                     mSubscription.add(observable.subscribeOn(Schedulers.newThread())
                             .observeOn(AndroidSchedulers.mainThread())
-                            .subscribe(this::getCreatedObservable, OpenCVActivity.this::onError));
+                            .subscribe(this::getCreatedObservable, Throwable::printStackTrace));
                 }));
     }
 
@@ -354,25 +231,6 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         if (mTesseractCounter == Tesseract.WORKER_POOL_SIZE) {
             Log.i(TAG, "Tesseract initialization finished");
         }
-    }
-
-    public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        mGrey = inputFrame.gray();
-        mRgba = inputFrame.rgba();
-
-        return mRgba;
-    }
-
-    private void initDetector() {
-        // C++: static Ptr_MSER create(int _delta = 5, int _min_area = 60, int _max_area = 14400, double _max_variation = 0.25, double _min_diversity = .2, int _max_evolution = 200, double _area_threshold = 1.01, double _min_margin = 0.003, int _edge_blur_size = 5)
-
-        mDetector = MSER.create();
-        // TODO use all features    mDetector = MSER.create(5, 60, 14400, 0.25,
-        //            0.2, 200, 1.01, 0.003, 5);
-        //    mDetector.setMinArea(60);
-        //    mDetector.setMaxArea(14400);
-        //    mDetector.setDelta(5);
-        // TODO ???    mDetector.setPass2Only();
     }
 
     @Override
@@ -421,6 +279,30 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
     }
 
+    public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
+        mGrey = inputFrame.gray();
+        mRgba = inputFrame.rgba();
+
+        return mRgba;
+    }
+
+    @Override
+    public void onCameraViewStopped() {
+        Log.i(TAG, "onCameraViewStopped called");
+    }
+
+    private void initDetector() {
+        // C++: static Ptr_MSER create(int _delta = 5, int _min_area = 60, int _max_area = 14400, double _max_variation = 0.25, double _min_diversity = .2, int _max_evolution = 200, double _area_threshold = 1.01, double _min_margin = 0.003, int _edge_blur_size = 5)
+
+        mDetector = MSER.create();
+        // TODO use all features    mDetector = MSER.create(5, 60, 14400, 0.25,
+        //            0.2, 200, 1.01, 0.003, 5);
+        //    mDetector.setMinArea(60);
+        //    mDetector.setMaxArea(14400);
+        //    mDetector.setDelta(5);
+        // TODO ???    mDetector.setPass2Only();
+    }
+
     public void onCameraViewStarted(int width, int height) {
         mOpenCVCameraView.initializeCamera();
         mOpenCVCameraView.setFocusMode(FocusCameraView.FOCUS_CONTINUOUS_PICTURE); // Continuous Picture Mode
@@ -428,172 +310,6 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mIntermediateMat = new Mat();
         mGrey = new Mat(height, width, CvType.CV_8UC4);
         mRgba = new Mat(height, width, CvType.CV_8UC4);
-    }
-
-    public void processBitmapResults(BitmapResults bitmapResults) {
-        List<Bitmap> bitmapRegions = bitmapResults.getRegions();
-
-        if (bitmapRegions == null || bitmapRegions.size() == 0) {
-            // no recognized regions
-            mTesseract.setAvailable(true);
-            Snackbar.make(mOpenCVCameraView,
-                    R.string.no_text_recognized_error, Snackbar.LENGTH_SHORT).show();
-            return;
-        }
-
-        List<BitmapRegion> regions = new ArrayList<>();
-        for (int i = 0; i < bitmapRegions.size(); i++) {
-            regions.add(new BitmapRegion(i, bitmapRegions.get(i)));
-        }
-
-        mTesseract.setAvailable(false);
-
-        ProgressDialog dialog = new ProgressDialog(this);
-        dialog.setCancelable(false);
-        dialog.setTitle(getString(R.string.loading));
-        dialog.setMessage(getString(R.string.text_processing));
-        dialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        dialog.setIndeterminate(false);
-        dialog.setMax(regions.size()); // last image in 'regions' is full image, not region
-        dialog.setProgress(0);
-        dialog.show();
-
-        Observable.create((Action1<Emitter<Void>>) emitter -> {
-            addBitmapsToNextUploading(regions, bitmapResults.getSourceBitmaps());
-            uploadAllBitmaps();
-            emitter.onCompleted();
-        }, Emitter.BackpressureMode.LATEST)
-                .subscribeOn(Schedulers.newThread())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(aVoid -> {
-                        }, this::onError,
-                        () -> Log.i(TAG, "Bitmaps uploading completed."));
-
-        List<RecognizedRegion> results = new ArrayList<>();
-
-        Observable
-                .from(regions)
-                .flatMap(Observable::just)
-                .subscribeOn(Schedulers.newThread())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(bitmapRegion -> Observable.create((Action1<Emitter<RecognizedRegion>>) emitter -> {
-                    RecognizedRegion region = mTesseract.processImage(bitmapRegion);
-                    emitter.onNext(region);
-                }, Emitter.BackpressureMode.LATEST)
-                        .subscribeOn(Schedulers.newThread())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(result -> {
-                            Log.i(TAG, "Result " + result);
-                            results.add(result);
-                            dialog.setProgress(dialog.getProgress() + 1);
-                            if (results.size() == regions.size()) {
-                                mTesseract.setAvailable(true);
-                                dialog.dismiss();
-                                onSuccess(results);
-                            }
-                        }, this::onError));
-    }
-
-    private void onError(Throwable throwable) {
-        throwable.printStackTrace();
-    }
-
-    private void onSuccess(List<RecognizedRegion> s) {
-        Collections.sort(s);
-        Log.i(TAG, "Results: " + s);
-        Intent data = new Intent();
-        ArrayList<RecognizedRegion> results = new ArrayList<>(s);
-        data.putParcelableArrayListExtra(KEY_SCAN_RESULTS, results);
-        setResult(RESULT_OK, data);
-        resetCurrentDriveData();
-
-        showResults(results);
-    }
-
-    private void resetCurrentDriveData() {
-        mCurrentTimeStamp = null;
-/*        for (BitmapRegion region : mCurrentBitmapRegions) {
-            region.getBitmap().recycle();
-        }
-        for (Bitmap bitmap : mCurrentSourceBitmaps) {
-            bitmap.recycle();
-        }*/
-        mCurrentBitmapRegions = new ArrayList<>();
-        mCurrentSourceBitmaps = new ArrayList<>();
-    }
-
-    private void showResults(ArrayList<RecognizedRegion> results) {
-
-        if (isTest) {
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < results.size(); i++) {
-                RecognizedRegion line = results.get(i);
-                builder.append(line);
-            }
-
-            uploadDiffToGoogleDrive(builder.toString(), folderName, "diff");
-        } else {
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < results.size(); i++) {
-                RecognizedRegion line = results.get(i);
-                builder.append("region#");
-                builder.append(line.getRegionNumber());
-                builder.append(": ");
-                builder.append(line);
-                builder.append("\n");
-            }
-
-            AlertDialog dialog = new AlertDialog.Builder(this)
-                    .setTitle(R.string.results)
-                    .setMessage(builder.toString())
-                    .setPositiveButton(R.string.done, (d, which) -> {
-                        d.dismiss();
-                        finish();
-                    })
-                    .setNeutralButton(R.string.reset_image, (d, which) -> {
-                        d.dismiss();
-                        resetToSourceImage();
-                    })
-                    .setNegativeButton(R.string.take_another_image, (d, which) -> {
-                        d.dismiss();
-                        resetToInitial();
-                    })
-                    .create();
-            dialog.show();
-        }
-    }
-
-    private void uploadDiffToGoogleDrive(String recognizedText, String folderName, String fileName) {
-        String sourceText = TestUtils.readTextFile(this, "test_ocr_text_2");
-
-        Observable.create((Action1<Emitter<String>>) emitter -> {
-            try {
-                String similarity = ParallelDotsHelper.findDiff(this, sourceText, recognizedText, fileName, folderName, mDriveResourceClient);
-                if (!TextUtils.isEmpty(similarity)) {
-                    similarities.add(similarity);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            emitter.onCompleted();
-        }, Emitter.BackpressureMode.LATEST)
-                .subscribeOn(Schedulers.newThread())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(aVoid -> {
-                        }, this::onError,
-                        () -> {
-                            Log.i(TAG, "Similarity uploaded to Google Drive.");
-                            testPhase++;
-                            handler.post(runTest);
-                        });
-    }
-
-    Runnable runTest = () -> {
-        test();
-    };
-
-    private void resetToSourceImage() {
-        detectRegions(false);
     }
 
     private void detectRegions(boolean initial) {
@@ -617,7 +333,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         mCurrentNoiseKernel = Kernel.TINY;
 
-        // crop image
+        initializeCropButtons();
+    }
+
+    private void initializeCropButtons() {
         mCropButtonsLayout.setVisibility(View.VISIBLE);
 
         mCropAcceptButton.setOnClickListener(v -> {
@@ -648,7 +367,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             Bitmap croppedBitmap = mCropImageView.getCroppedImage();
             Mat croppedMat = OpenCVUtils.createMat(croppedBitmap);
 
-            Bitmap skewedBitmap = textSkew(croppedMat);
+            Bitmap skewedBitmap = textDeskew(croppedMat);
             mCropImageView.setImageBitmap(skewedBitmap);
         });
 
@@ -662,70 +381,42 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
     }
 
+    private Mat imagePostProcessing(Mat mat) {
+        List<SourceBitmap> sourceImages = new ArrayList<>();
+
+        //Imgproc.GaussianBlur(mat, mat, new Size(3, 3), 0); // TODO gaussian -> median?
+        Imgproc.medianBlur(mat, mat, 3);
+
+        sourceImages.add(OpenCVUtils.createSourceBitmap("1/3 post median blur", mat));
+
+        Imgproc.adaptiveThreshold(mat, mat, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 5, 4);
+
+        sourceImages.add(OpenCVUtils.createSourceBitmap("2/3 post adaptive threshold", mat));
+
+        Imgproc.threshold(mat, mat, 0, 255, Imgproc.THRESH_OTSU);
+
+        sourceImages.add(OpenCVUtils.createSourceBitmap("3/3 post otsu threshold", mat));
+
+        addBitmapsToNextUpload(new ArrayList<>(), sourceImages);
+
+        //    Imgproc.adaptiveThreshold(tmp, tmp, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
+        return mat;
+    }
+
     private void recognizeMat(Mat mat) {
-        List<Bitmap> sourceImages = new ArrayList<>();
-        sourceImages.add(mSavedSource); // full image source*/
+        List<SourceBitmap> sourceImages = new ArrayList<>();
+        sourceImages.add(new SourceBitmap("full image source", mSavedSource)); // full image source
 
         mIntermediateMat = mat;
-
-        MatOfKeyPoint keypoint = new MatOfKeyPoint();
-        List<KeyPoint> listpoint;
-        KeyPoint kpoint;
-        Mat mask = Mat.zeros(mat.size(), CvType.CV_8UC1);
-        int rectanx1, rectany1, rectanx2, rectany2;
-
-        List<MatOfPoint> contours = new ArrayList<>();
-        Mat kernel = Kernel.LARGE.generate();
-        Mat morbyte = new Mat();
-        Mat hierarchy = new Mat();
-
-        Rect rectan3;
-        //
 
         if (mDetector == null) {
             initDetector();
         }
 
-        mDetector.detect(mat, keypoint);
-        listpoint = keypoint.toList();
+        List<MatOfPoint> contours = OpenCVUtils.detectRegions(mDetector, mat);
 
-        for (int i = 0; i < listpoint.size(); i++) {
-            kpoint = listpoint.get(i);
-            rectanx1 = (int) (kpoint.pt.x - 0.5 * kpoint.size);
-            rectany1 = (int) (kpoint.pt.y - 0.5 * kpoint.size);
-            rectanx2 = (int) (kpoint.size);
-            rectany2 = (int) (kpoint.size);
-            if (rectanx1 <= 0)
-                rectanx1 = 1;
-            if (rectany1 <= 0)
-                rectany1 = 1;
-            if ((rectanx1 + rectanx2) > mat.width())
-                rectanx2 = mat.width() - rectanx1;
-            if ((rectany1 + rectany2) > mat.height())
-                rectany2 = mat.height() - rectany1;
-            Rect rectant = new Rect(rectanx1, rectany1, rectanx2, rectany2);
-            try {
-                Mat roi = new Mat(mask, rectant);
-                roi.setTo(CONTOUR_COLOR);
-            } catch (Exception ex) {
-                Log.d(TAG, "mat roi error " + ex.getMessage());
-            }
-        }
-
-     /*   Bitmap sourceMask = OpenCVUtils.createBitmap(mask);
-        sourceImages.add(sourceMask); // mask before dilation filter, but with detected contours*/
-
-        Imgproc.morphologyEx(mask, morbyte, Imgproc.MORPH_DILATE, kernel); // dilate filter
-
-/*        Bitmap sourceImage = OpenCVUtils.createBitmap(morbyte);
-        sourceImages.add(sourceImage); // mask after dilation filter*/
-
-        Imgproc.findContours(morbyte, contours, hierarchy,
-                Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
-
-        Collections.reverse(contours);
-
-        if (isTest && contours.size() > optimalRegionsNumber && optimalRegionsNumber != 0) {
+        if (isTest &&
+                ((contours.size() > optimalRegionsNumber && optimalRegionsNumber != 0) || contours.size() > MAX_OPTIMAL_REGIONS)) {
             resetCurrentDriveData();
             testPhase++;
             handler.post(runTest);
@@ -733,6 +424,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
 
         List<Bitmap> bitmapsToRecognize = new ArrayList<>();
+        Rect rectan3;
 
         for (int ind = 0; ind < contours.size(); ind++) {
             rectan3 = Imgproc.boundingRect(contours.get(ind));
@@ -755,12 +447,137 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             optimalRegionsNumber = bitmapsToRecognize.size();
         }
 
-/*        Bitmap sourceCropped = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceCropped);*/
-
         BitmapResults results = new BitmapResults(bitmapsToRecognize, sourceImages);
 
-        processBitmapResults(results);
+        processRegions(results);
+    }
+
+    public void processRegions(BitmapResults bitmapResults) {
+        List<Bitmap> bitmapRegions = bitmapResults.getRegions();
+
+        if (bitmapRegions == null || bitmapRegions.size() == 0) {
+            // no recognized regions
+            mTesseract.setAvailable(true);
+            Snackbar.make(mOpenCVCameraView,
+                    R.string.no_text_recognized_error, Snackbar.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<BitmapRegion> regions = new ArrayList<>();
+        for (int i = 0; i < bitmapRegions.size(); i++) {
+            regions.add(new BitmapRegion(i, bitmapRegions.get(i)));
+        }
+
+        mTesseract.setAvailable(false);
+
+        ProgressDialog dialog = new ProgressDialog(this);
+        dialog.setCancelable(false);
+        dialog.setTitle(getString(R.string.loading));
+        dialog.setMessage(getString(R.string.text_processing));
+        dialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        dialog.setIndeterminate(false);
+        dialog.setMax(regions.size()); // last image in 'regions' is full image, not region
+        dialog.setProgress(0);
+        dialog.show();
+
+        Observable.create((Action1<Emitter<Void>>) emitter -> {
+            addBitmapsToNextUpload(regions, bitmapResults.getSourceBitmaps());
+            uploadAllBitmaps(); // uploads all collected region bitmaps + source bitmaps together
+            emitter.onCompleted();
+        }, Emitter.BackpressureMode.LATEST)
+                .subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(aVoid -> {
+                        }, Throwable::printStackTrace,
+                        () -> Log.i(TAG, "Bitmaps uploading completed."));
+
+        List<RecognizedRegion> results = new ArrayList<>();
+
+        Observable
+                .from(regions)
+                .flatMap(Observable::just)
+                .subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(bitmapRegion -> Observable.create((Action1<Emitter<RecognizedRegion>>) emitter -> {
+                    RecognizedRegion region = mTesseract.processImage(bitmapRegion);
+                    emitter.onNext(region);
+                }, Emitter.BackpressureMode.LATEST)
+                        .subscribeOn(Schedulers.newThread())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(result -> {
+                            Log.i(TAG, "Result " + result);
+                            results.add(result);
+                            dialog.setProgress(dialog.getProgress() + 1);
+                            if (results.size() == regions.size()) {
+                                mTesseract.setAvailable(true);
+                                dialog.dismiss();
+                                tesseractRecognitionCompleted(results);
+                            }
+                        }, Throwable::printStackTrace));
+    }
+
+    private void tesseractRecognitionCompleted(List<RecognizedRegion> s) {
+        Collections.sort(s);
+        Log.i(TAG, "Results: " + s);
+        Intent data = new Intent();
+        ArrayList<RecognizedRegion> results = new ArrayList<>(s);
+        data.putParcelableArrayListExtra(KEY_SCAN_RESULTS, results);
+        setResult(RESULT_OK, data);
+
+        resetCurrentDriveData();
+
+        showResultsDialog(results);
+    }
+
+    private void resetCurrentDriveData() {
+        mCurrentTimeStamp = null;
+        mCurrentBitmapRegions = new ArrayList<>();
+        mCurrentSourceBitmaps = new ArrayList<>();
+    }
+
+    private void showResultsDialog(ArrayList<RecognizedRegion> results) {
+        if (isTest) {
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < results.size(); i++) {
+                RecognizedRegion line = results.get(i);
+                builder.append(line);
+            }
+
+            uploadDiffToGoogleDrive(builder.toString(), folderName, "diff");
+            return;
+        }
+
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < results.size(); i++) {
+            RecognizedRegion line = results.get(i);
+            builder.append("region#");
+            builder.append(line.getRegionNumber());
+            builder.append(": ");
+            builder.append(line);
+            builder.append("\n");
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.results)
+                .setMessage(builder.toString())
+                .setPositiveButton(R.string.done, (d, which) -> {
+                    d.dismiss();
+                    finish();
+                })
+                .setNeutralButton(R.string.reset_image, (d, which) -> {
+                    d.dismiss();
+                    resetToSourceImage();
+                })
+                .setNegativeButton(R.string.take_another_image, (d, which) -> {
+                    d.dismiss();
+                    resetToInitial();
+                })
+                .create();
+        dialog.show();
+    }
+
+    private void resetToSourceImage() {
+        detectRegions(false);
     }
 
     private Mat clearNoise(Mat mat) {
@@ -776,99 +593,11 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         return mat;
     }
 
-    private Mat dilate(Mat mat) {
-        Mat kernel = Kernel.TINY.generate();
-        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_DILATE, kernel);
-        return mat;
-    }
-
-    private Mat erode(Mat mat) {
-        Mat kernel = Kernel.TINY.generate();
-        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_ERODE, kernel);
-        return mat;
-    }
-
-    private Mat close(Mat mat) {
-        Mat kernel = Kernel.TINY.generate();
-        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
-        return mat;
-    }
-
-    private Mat open(Mat mat) {
-        Mat kernel = Kernel.TINY.generate();
-        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_OPEN, kernel);
-        return mat;
-    }
-
-    private Mat imagePostProcessing(Mat mat) {
-/*        float fishVal = 600.0f;
-        DisplayMetrics displayMetrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
-        int cX = displayMetrics.widthPixels; // 1920
-        int cY = displayMetrics.heightPixels; // 1080
-
-        Mat k = new Mat(3, 3, CvType.CV_32FC1);
-        k.put(0, 0, new float[]{fishVal, 0, cX});
-        k.put(1, 0, new float[]{0, fishVal, cY});
-        k.put(2, 0, new float[]{0, 0, 1});
-
-        Mat d = new Mat(1, 4, CvType.CV_32FC1);
-        d.put(0, 0, new float[]{0, 0, 0, 0});
-
-        Mat kNew = k.clone();
-        kNew.put(0, 0, new float[]{fishVal * 0.4f, 0.0f, cX});
-        kNew.put(1, 0, new float[]{0.0f, fishVal * 0.4f, cY});
-        kNew.put(2, 0, new float[]{0.0f, 0.0f, 1.0f});
-
-    //    Imgproc.undistort(mat, mat, k, d, kNew);
-        Calib3d.undistortImage(mat, mat, k, d, kNew, mat.size());*/
-
-        List<Bitmap> sourceImages = new ArrayList<>();
-
-/*        Bitmap sourceImage = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceImage);*/
-
-        //Imgproc.GaussianBlur(mat, mat, new Size(3, 3), 0); // TODO gaussian -> median?
-        Imgproc.medianBlur(mat, mat, 3);
-
-/*        sourceImage = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceImage);*/
-
-        Imgproc.adaptiveThreshold(mat, mat, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 5, 4);
-
-/*        sourceImage = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceImage);*/
-
-   /*     Mat kernel = Kernel.TINY.generate();
-        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_CLOSE, kernel);
-
-        sourceImage = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceImage);
-
-        // TODO enable?
-        Mat erodeKernel = Kernel.TINY.generate();
-        Imgproc.morphologyEx(mat, mat, Imgproc.MORPH_ERODE, erodeKernel);
-*/
-/*        sourceImage = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceImage);*/
-
-        Imgproc.threshold(mat, mat, 0, 255, Imgproc.THRESH_OTSU);
-
-/*        sourceImage = OpenCVUtils.createBitmap(mat);
-        sourceImages.add(sourceImage);*/
-
-        addBitmapsToNextUploading(new ArrayList<>(), sourceImages);
-
-        //    Imgproc.adaptiveThreshold(tmp, tmp, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
-        return mat;
-    }
-
-
-    private Bitmap textSkew(Mat greyscale) {
-        List<Bitmap> sourceImages = new ArrayList<>();
+    private Bitmap textDeskew(Mat greyscale) {
+        List<SourceBitmap> sourceImages = new ArrayList<>();
 
         Bitmap sourceImage = OpenCVUtils.createBitmap(greyscale);
-        sourceImages.add(sourceImage);
+        sourceImages.add(new SourceBitmap("cropped pre-deskew image", sourceImage));
 
         Mat source = greyscale.clone();
 
@@ -877,28 +606,22 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         Imgproc.adaptiveThreshold(greyscale, greyscale, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
         //Imgproc.threshold(greyscale, greyscale, 200, 255, Imgproc.THRESH_BINARY);
 
-/*        Bitmap sourceThreshold = OpenCVUtils.createBitmap(greyscale);
-        sourceImages.add(sourceThreshold);*/
+        sourceImages.add(OpenCVUtils.createSourceBitmap("deskew 1/5 ", greyscale));
 
         //Invert the colors (because objects are represented as white pixels, and the background is represented by black pixels)
         Core.bitwise_not(greyscale, greyscale);
         Mat element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(3, 3));
 
-/*        Bitmap sourceElement = OpenCVUtils.createBitmap(element);
-        sourceImages.add(sourceElement);*/
+        sourceImages.add(OpenCVUtils.createSourceBitmap("deskew 2/5", greyscale));
 
         //We can now perform our erosion, we must declare our rectangle-shaped structuring element and call the erode function
         Imgproc.erode(greyscale, greyscale, element);
-
-/*        Bitmap sourceErodedGreyscale = OpenCVUtils.createBitmap(greyscale);
-        sourceImages.add(sourceErodedGreyscale);*/
 
         //Find all white pixels
         Mat wLocMat = Mat.zeros(greyscale.size(), greyscale.type());
         Core.findNonZero(greyscale, wLocMat);
 
-/*        Bitmap sourceLockMat = OpenCVUtils.createBitmap(greyscale);
-        sourceImages.add(sourceLockMat);*/
+        sourceImages.add(OpenCVUtils.createSourceBitmap("deskew 3/5", greyscale));
 
         //Create an empty Mat and pass it to the function
         MatOfPoint matOfPoint = new MatOfPoint(wLocMat);
@@ -917,34 +640,24 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             boxContours.add(new MatOfPoint(vertices));
             Imgproc.drawContours(greyscale, boxContours, 0, new Scalar(128, 128, 128), -1);
 
-/*            Bitmap sourceGreyscale = OpenCVUtils.createBitmap(greyscale);
-            sourceImages.add(sourceGreyscale);*/
+            sourceImages.add(OpenCVUtils.createSourceBitmap("deskew 4/5", greyscale));
 
             // always landscape orientation!
             rotatedRect.angle = rotatedRect.angle < -45 ? rotatedRect.angle + 90.f : rotatedRect.angle;
             double resultAngle = rotatedRect.angle;
 
-            Mat result = deskew(source, resultAngle);
+            Mat result = OpenCVUtils.deskew(source, resultAngle);
 
             Bitmap bitmap = OpenCVUtils.createBitmap(result);
-            sourceImages.add(bitmap);
+            sourceImages.add(new SourceBitmap("deskew 5/5", bitmap));
 
-            addBitmapsToNextUploading(new ArrayList<>(), sourceImages);
+            addBitmapsToNextUpload(new ArrayList<>(), sourceImages);
 
             return bitmap;
         } catch (Exception e) {
             e.printStackTrace();
             return sourceImage;
         }
-    }
-
-    public Mat deskew(Mat src, double angle) {
-        Point center = new Point(src.width() / 2, src.height() / 2);
-        Mat rotImage = Imgproc.getRotationMatrix2D(center, angle, 1.0);
-        //1.0 means 100 % scale
-        Size size = new Size(src.width(), src.height());
-        Imgproc.warpAffine(src, src, rotImage, size, Imgproc.INTER_LINEAR + Imgproc.CV_WARP_FILL_OUTLIERS);
-        return src;
     }
 
     private void resetToInitial() {
@@ -957,13 +670,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         TestUtils.removeImage();
     }
 
-    @Override
-    public void onCameraViewStopped() {
-        Log.i(TAG, "onCameraViewStopped called");
-    }
-
-    public void addBitmapsToNextUploading(List<BitmapRegion> regions, List<Bitmap> sourceBitmaps) {
-        mCurrentBitmapRegions.addAll(regions);
+    public void addBitmapsToNextUpload(@Nullable List<BitmapRegion> regions, @Nullable List<SourceBitmap> sourceBitmaps) {
+        if (regions != null && regions.size() > 0) {
+            mCurrentBitmapRegions.addAll(regions);
+        }
 
         if (sourceBitmaps != null && sourceBitmaps.size() > 0) {
             mCurrentSourceBitmaps.addAll(sourceBitmaps);
@@ -986,12 +696,13 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
                 for (int i = 0; i < mCurrentBitmapRegions.size(); i++) {
                     BitmapRegion region = mCurrentBitmapRegions.get(i);
-                    addGoogleDriveImage(region.getBitmap(), "region #" + region.getRegionNumber(), folderName);
+                    uploadGoogleDriveImage(region.getBitmap(), "region #" + region.getRegionNumber(), folderName);
                 }
 
                 if (mCurrentSourceBitmaps != null && mCurrentSourceBitmaps.size() > 0) {
                     for (int i = 0; i < mCurrentSourceBitmaps.size(); i++) {
-                        addGoogleDriveImage(mCurrentSourceBitmaps.get(i), "source image " + i, folderName);
+                        SourceBitmap source = mCurrentSourceBitmaps.get(i);
+                        uploadGoogleDriveImage(source.getBitmap(), source.getName(), folderName);
                     }
                 }
 
@@ -1000,7 +711,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
     }
 
-    private void addGoogleDriveImage(Bitmap image, String name, String folderName) {
+    private void uploadGoogleDriveImage(Bitmap image, String name, String folderName) {
         final Task<DriveContents> createContentsTask = mDriveResourceClient.createContents();
         Task<MetadataBuffer> folders = DriveUtils.getMetadataForFolder(folderName, mDriveResourceClient);
 
@@ -1018,4 +729,149 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                     Log.e(TAG, "Unable to create file", e);
                 });
     }
+
+    private void test() {
+        int resourceId = R.drawable.ocr_test_3; //R.drawable.test_ocr_image;
+        Mat sourceMat = null;
+        try {
+            Bitmap bmp = BitmapFactory.decodeResource(getResources(), resourceId);
+
+            sourceMat = OpenCVUtils.createMat(bmp);
+
+            if (Core.countNonZero(sourceMat) != 0) { // non-empty matrix (and not 0x0 matrix)
+                mSavedSource = OpenCVUtils.createBitmap(imagePostProcessing(sourceMat));
+
+                sourceMat = clearNoise(sourceMat);
+
+                sourceMat = OpenCVUtils.createMat(textDeskew(sourceMat));
+            }
+        } catch (OutOfMemoryError e) {
+            e.printStackTrace();
+        }
+
+        switch (testPhase) {
+            case 0:
+                Snackbar.make(mCropImageView, getMessageForTestStep(0), Snackbar.LENGTH_SHORT).show();
+                if (sourceMat != null) {
+                    recognizeMat(sourceMat);
+                }
+                break;
+            case 1:
+                Snackbar.make(mCropImageView, getMessageForTestStep(1), Snackbar.LENGTH_SHORT).show();
+                sourceMat = OpenCVUtils.dilate(sourceMat);
+                recognizeMat(sourceMat);
+                break;
+            case 2:
+                Snackbar.make(mCropImageView, getMessageForTestStep(2), Snackbar.LENGTH_SHORT).show();
+                sourceMat = OpenCVUtils.erode(sourceMat);
+                recognizeMat(sourceMat);
+                break;
+            case 3:
+                Snackbar.make(mCropImageView, getMessageForTestStep(3), Snackbar.LENGTH_SHORT).show();
+                sourceMat = OpenCVUtils.close(sourceMat);
+                recognizeMat(sourceMat);
+                break;
+            case 4:
+                Snackbar.make(mCropImageView, getMessageForTestStep(4), Snackbar.LENGTH_SHORT).show();
+                sourceMat = OpenCVUtils.open(sourceMat);
+                recognizeMat(sourceMat);
+                break;
+            case 5:
+                Snackbar.make(mCropImageView, getMessageForTestStep(5), Snackbar.LENGTH_SHORT).show();
+                uploadSimilaritiesResults();
+                break;
+            default:
+                break;
+        }
+    }
+
+    private String getMessageForTestStep(int step) {
+        return "Test step " + step + ": " + getTestFolderPrefix();
+    }
+
+    private String getTestFolderPrefix() {
+        switch (testPhase) {
+            case 0:
+                return "base";
+            case 1:
+                return "dilate";
+            case 2:
+                return "erode";
+            case 3:
+                return "close";
+            case 4:
+                return "open";
+            case 5:
+                return "results";
+            default:
+                return "error";
+        }
+    }
+
+    private void uploadSimilaritiesResults() {
+        if (TextUtils.isEmpty(mCurrentTimeStamp)) {
+            mCurrentTimeStamp = Utils.getCurrentTimestamp();
+
+            folderName = getTestFolderPrefix() + mCurrentTimeStamp + " openCV";
+
+            Task<DriveFolder> folderTask = DriveUtils.createFolder(folderName, mDriveResourceClient);
+            folderTask.continueWith(task -> {
+                DriveFolder parentFolder = folderTask.getResult();
+
+                final Task<DriveContents> createContentsTask = mDriveResourceClient.createContents();
+                Task<MetadataBuffer> folders = DriveUtils.getMetadataForFolder(folderName, mDriveResourceClient);
+
+                Tasks.whenAll(folders, createContentsTask).continueWithTask(task2 -> {
+                    MetadataBuffer metadata = folders.getResult();
+                    DriveFolder folder = DriveUtils.getDriveFolder(metadata, folderName);
+
+                    DriveContents contents = createContentsTask.getResult();
+
+                    metadata.release();
+
+                    StringBuilder builder = new StringBuilder();
+                    for (String s : similarities) {
+                        builder.append(s);
+                        builder.append("\n");
+                    }
+
+
+                    return DriveUtils.createText(contents, builder.toString(), "results", folder, mDriveResourceClient);
+                }).addOnCompleteListener(this, task1 -> {
+                    Log.i(TAG, "Finished similarity results upload.");
+                    finish();
+                }).addOnFailureListener(this, e -> Log.e(TAG, "Unable to create file", e));
+
+                return null;
+            });
+        }
+    }
+
+    private void uploadDiffToGoogleDrive(String recognizedText, String folderName, String fileName) {
+        String sourceText = TestUtils.readTextFile(this, "test_ocr_text_2");
+
+        Observable.create((Action1<Emitter<String>>) emitter -> {
+            try {
+                String similarity = ParallelDotsHelper.findDiff(this, sourceText, recognizedText, fileName, folderName, mDriveResourceClient);
+                if (!TextUtils.isEmpty(similarity)) {
+                    similarities.add(similarity);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            emitter.onCompleted();
+        }, Emitter.BackpressureMode.LATEST)
+                .subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(aVoid -> {
+                        }, Throwable::printStackTrace,
+                        () -> {
+                            Log.i(TAG, "Similarity uploaded to Google Drive.");
+                            testPhase++;
+                            handler.post(runTest);
+                        });
+    }
+
+    Runnable runTest = this::test;
+
 }

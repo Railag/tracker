@@ -42,7 +42,7 @@
     <string name="sharing_message">Select app for sharing</string>
     <string name="recognition_in_progress_error">Wait till previous recognition is finished</string>
     <string name="results">Results</string>
-    <string name="reset_image">Reset image</string>
+    <string name="reset_image">Reset source</string>
     <string name="take_another_image">Take Another Image</string>
     <string name="en">EN</string>
     <string name="ru">RU</string>
