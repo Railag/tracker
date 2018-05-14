@@ -120,7 +120,7 @@ public class FocusCameraView extends JavaCameraView {
         RectF rectF = new RectF(adjustedWidth, adjustedHeight, adjustedWidth + focusAreaSize, adjustedHeight + focusAreaSize);
         getMatrix().mapRect(rectF);
 
-        final int l = clamp(Math.round(rectF.left), -1000, 1000); // TODO fix
+        final int l = clamp(Math.round(rectF.left), -1000, 1000);
         final int t = clamp(Math.round(rectF.top), -1000, 1000);
         final int r = clamp(Math.round(rectF.right), -1000, 1000);
         final int b = clamp(Math.round(rectF.bottom), -1000, 1000);

@@ -42,9 +42,6 @@ public class TestUtils {
 
         String filename = file.toString();
         Mat mat = Imgcodecs.imread(filename, 0);
-        //    if (Core.countNonZero(mat) != 0) { // non-empty matrix (and not 0x0 matrix) -> turn to white-black channel
-        //    Imgproc.cvtColor(mat, mat, Imgproc.COLOR_BGR2GRAY);
-        //    }
         return mat;
     }
 

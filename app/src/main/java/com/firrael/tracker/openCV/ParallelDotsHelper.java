@@ -152,9 +152,7 @@ public class ParallelDotsHelper {
 
                 return DriveUtils.createText(contents, similarity + "\n\n" + text1 + "\n\n\n" + text2, fileName, folder, driveResourceClient);
             })
-                    .addOnFailureListener(activity, e -> {
-                        Log.e(TAG, "Unable to create file", e);
-                    });
+                    .addOnFailureListener(activity, e -> Log.e(TAG, "Unable to create file", e));
             return similarity;
         } catch (Exception e) {
             e.printStackTrace();
