@@ -27,7 +27,8 @@ public class Tesseract {
     private String datapath;
     private List<TessBaseAPI> mWorkers;
     private Language language;
-    Context context;
+    private int pageSegmentationMode;
+    private Context context;
 
     private static int sCurrentWorker = 0;
 
@@ -52,10 +53,11 @@ public class Tesseract {
         }
     }
 
-    public Tesseract(Context context, Language language) {
+    public Tesseract(Context context, Language language, int pageSegmentationMode) {
         this.context = context;
         datapath = Environment.getExternalStorageDirectory() + "/ocrctz/";
         this.language = language;
+        this.pageSegmentationMode = pageSegmentationMode;
         File dir = new File(datapath + "/tessdata/");
         //    File file = new File(datapath + "/tessdata/" + "eng.traineddata");
         File file = new File(datapath + "/tessdata/" + language.getLocaleTag() + ".traineddata");
@@ -75,8 +77,8 @@ public class Tesseract {
 
         TessBaseAPI worker = new TessBaseAPI();
         String language = this.language.getLocaleTag();
-        //    worker.setPageSegMode(TessBaseAPI.PageSegMode.PSM_SPARSE_TEXT);
-        worker.init(datapath, language); //Auto only        mWorkers.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO_ONLY);
+        worker.setPageSegMode(pageSegmentationMode);
+        worker.init(datapath, language);
         if (!isClosing) {
             mWorkers.add(worker);
         }

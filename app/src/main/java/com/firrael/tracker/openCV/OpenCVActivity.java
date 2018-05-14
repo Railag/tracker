@@ -32,6 +32,7 @@ import com.google.android.gms.drive.DriveResourceClient;
 import com.google.android.gms.drive.MetadataBuffer;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.googlecode.tesseract.android.TessBaseAPI;
 import com.theartofdev.edmodo.cropper.CropImageView;
 
 import org.opencv.android.BaseLoaderCallback;
@@ -197,7 +198,10 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     private void initializeTesseract() {
-        mTesseract = new Tesseract(this, mLanguage);
+        int pageSegmentationMode = TessBaseAPI.PageSegMode.PSM_SINGLE_BLOCK; // default
+        //int pageSegmentationMode = TessBaseAPI.PageSegMode.PSM_SINGLE_LINE;
+
+        mTesseract = new Tesseract(this, mLanguage, pageSegmentationMode);
 
         mTesseractCounter = 0;
 
@@ -288,6 +292,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         // C++: static Ptr_MSER create(int _delta = 5, int _min_area = 60, int _max_area = 14400, double _max_variation = 0.25, double _min_diversity = .2, int _max_evolution = 200, double _area_threshold = 1.01, double _min_margin = 0.003, int _edge_blur_size = 5)
 
         mDetector = MSER.create();
+        mDetector.setDelta(5); // TODO default, find better delta?
 
         // TODO use all features    mDetector = MSER.create(5, 60, 14400, 0.25,
         //            0.2, 200, 1.01, 0.003, 5);
@@ -320,7 +325,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         } else {
             Mat mat = mGrey.clone();
             TestUtils.saveImage(mat);
-            addSourceBitmap(OpenCVUtils.createSourceBitmap("RGB source", mRgba.clone()));
+            addSourceBitmap(OpenCVUtils.createSourceBitmap("1RGB source", mRgba.clone()));
 
             if (initial) {
                 Mat tmp = imagePostProcessing(mat);
@@ -435,6 +440,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             }
         }
 
+        addSourceBitmap(OpenCVUtils.createSourceBitmap("1regions", mat)); // full image source
+
         if (isTest && optimalRegionsNumber == 0) {
             optimalRegionsNumber = bitmapsToRecognize.size();
         }
@@ -545,7 +552,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             builder.append("\n");
         }
 
-        uploadResultsToGoogleDrive(builder.toString(), folderName, "results");
+        uploadResultsToGoogleDrive(builder.toString(), folderName, "1results");
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.results)
@@ -673,6 +680,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         mOpenCVCameraView.enableView();
 
         TestUtils.removeImage();
+
+        resetCurrentDriveData();
     }
 
     public void addSourceBitmap(SourceBitmap sourceBitmap) {
