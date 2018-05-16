@@ -425,6 +425,9 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         for (int ind = 0; ind < contours.size(); ind++) {
             rectan3 = Imgproc.boundingRect(contours.get(ind));
+            // TODO some extra space for text
+            rectan3.y -= 5;
+            rectan3.height += 10;
             Imgproc.rectangle(mat, rectan3.br(), rectan3.tl(),
                     CONTOUR_COLOR);
             Bitmap bmp = null;
