@@ -423,12 +423,14 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         List<Bitmap> bitmapsToRecognize = new ArrayList<>();
         Rect rectan3;
 
+        Mat regionsSubmat = mat.clone();
+
         for (int ind = 0; ind < contours.size(); ind++) {
             rectan3 = Imgproc.boundingRect(contours.get(ind));
             // TODO some extra space for text
             rectan3.y -= 5;
             rectan3.height += 10;
-            Imgproc.rectangle(mat, rectan3.br(), rectan3.tl(),
+            Imgproc.rectangle(regionsSubmat, rectan3.br(), rectan3.tl(),
                     CONTOUR_COLOR);
             Bitmap bmp = null;
             try {
@@ -443,7 +445,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             }
         }
 
-        addSourceBitmap(OpenCVUtils.createSourceBitmap("1regions", mat)); // full image source
+        addSourceBitmap(OpenCVUtils.createSourceBitmap("1regions", regionsSubmat));
 
         if (isTest && optimalRegionsNumber == 0) {
             optimalRegionsNumber = bitmapsToRecognize.size();
