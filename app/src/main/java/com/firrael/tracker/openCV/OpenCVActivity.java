@@ -421,22 +421,23 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
 
         List<Bitmap> bitmapsToRecognize = new ArrayList<>();
-        Rect rectan3;
+        Rect contourRect;
 
         Mat regionsSubmat = mat.clone();
 
-        for (int ind = 0; ind < contours.size(); ind++) {
-            rectan3 = Imgproc.boundingRect(contours.get(ind));
+        for (int i = 0; i < contours.size(); i++) {
+            contourRect = Imgproc.boundingRect(contours.get(i));
             // TODO some extra space for text
-            rectan3.y -= 5;
-            rectan3.height += 10;
-            Imgproc.rectangle(regionsSubmat, rectan3.br(), rectan3.tl(),
+            contourRect.y -= 5;
+            contourRect.height += 10;
+            Imgproc.rectangle(mat, contourRect.br(), contourRect.tl(),
                     CONTOUR_COLOR);
             Bitmap bmp = null;
             try {
                 Mat croppedPart;
-                croppedPart = mIntermediateMat.submat(rectan3);
-                bmp = OpenCVUtils.createBitmap(croppedPart);
+                croppedPart = regionsSubmat.submat(contourRect);
+                bmp = regionDeskew(croppedPart, i);
+                //bmp = OpenCVUtils.createBitmap(croppedPart);
             } catch (Exception e) {
                 Log.d(TAG, "cropped part data error " + e.getMessage());
             }
@@ -611,6 +612,70 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
         mCurrentNoiseKernel.increase();
         return mat;
+    }
+
+    private Bitmap regionDeskew(Mat mat, int index) {
+        Bitmap sourceImage = OpenCVUtils.createBitmap(mat);
+        addSourceBitmap(new SourceBitmap(index + " cropped pre-deskew image", sourceImage));
+
+        Mat source = mat.clone();
+
+        //Binarize it
+        //Use adaptive threshold if necessary
+        Imgproc.adaptiveThreshold(mat, mat, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
+        //Imgproc.threshold(greyscale, greyscale, 200, 255, Imgproc.THRESH_BINARY);
+
+        addSourceBitmap(OpenCVUtils.createSourceBitmap(index + " deskew 1/5 ", mat));
+
+        //Invert the colors (because objects are represented as white pixels, and the background is represented by black pixels)
+        Core.bitwise_not(mat, mat);
+        Mat element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(3, 3));
+
+        addSourceBitmap(OpenCVUtils.createSourceBitmap(index + " deskew 2/5", mat));
+
+        //We can now perform our erosion, we must declare our rectangle-shaped structuring element and call the erode function
+        Imgproc.erode(mat, mat, element);
+
+        addSourceBitmap(OpenCVUtils.createSourceBitmap(index + " deskew 3/5", mat));
+
+        //Find all white pixels
+        Mat wLocMat = Mat.zeros(mat.size(), mat.type());
+        Core.findNonZero(mat, wLocMat);
+
+        //Create an empty Mat and pass it to the function
+        MatOfPoint matOfPoint = new MatOfPoint(wLocMat);
+
+        //Translate MatOfPoint to MatOfPoint2f in order to user at a next step
+        MatOfPoint2f mat2f = new MatOfPoint2f();
+        matOfPoint.convertTo(mat2f, CvType.CV_32FC2);
+
+        try {
+            //Get rotated rect of white pixels
+            RotatedRect rotatedRect = Imgproc.minAreaRect(mat2f);
+
+            Point[] vertices = new Point[4];
+            rotatedRect.points(vertices);
+            List<MatOfPoint> boxContours = new ArrayList<>();
+            boxContours.add(new MatOfPoint(vertices));
+            Imgproc.drawContours(mat, boxContours, 0, new Scalar(128, 128, 128), -1);
+
+            addSourceBitmap(OpenCVUtils.createSourceBitmap(index + " deskew 4/5", mat));
+
+            // always landscape orientation!
+            rotatedRect.angle = rotatedRect.angle < -45 ? rotatedRect.angle + 90.f : rotatedRect.angle;
+            double resultAngle = rotatedRect.angle;
+
+            Mat result = OpenCVUtils.deskew(source, resultAngle);
+
+            Bitmap bitmap = OpenCVUtils.createBitmap(result);
+
+            addSourceBitmap(new SourceBitmap(index + " deskew 5/5", bitmap));
+
+            return bitmap;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return sourceImage;
+        }
     }
 
     private Bitmap textDeskew(Mat mat) {
@@ -892,5 +957,4 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     Runnable runTest = this::test;
-
 }
