@@ -98,7 +98,6 @@ public class FocusCameraView extends JavaCameraView {
      * Convert touch position x:y to {@link Camera.Area} position -1000:-1000 to 1000:1000.
      */
     private android.graphics.Rect calculateTapArea(float x, float y, float coefficient) { // x,y - from touch events, x - height, y - width, full x = resolution - top black bar - bottom black bar
-
         if (getContext() == null || !(getContext() instanceof Activity)) {
             return new Rect(-1000, 900, 1000, -900); // whole screen
         }
@@ -109,8 +108,6 @@ public class FocusCameraView extends JavaCameraView {
         int realWidth = displayMetrics.widthPixels; // 1920
         int realHeight = displayMetrics.heightPixels; // 1080
 
-        // 1903/1920, 14/1080.
-        // x /1000,   y/1000.
         int adjustedWidth = (int) (x * 1000 / realWidth);
         int adjustedHeight = (int) (y * 1000 / realHeight);
 

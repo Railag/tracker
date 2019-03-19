@@ -5,8 +5,10 @@ import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
@@ -27,9 +29,11 @@ import com.firrael.tracker.Utils;
 import com.firrael.tracker.tesseract.RecognizedRegion;
 import com.firrael.tracker.tesseract.Tesseract;
 import com.google.android.gms.drive.DriveContents;
+import com.google.android.gms.drive.DriveFile;
 import com.google.android.gms.drive.DriveFolder;
 import com.google.android.gms.drive.DriveResourceClient;
 import com.google.android.gms.drive.MetadataBuffer;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.googlecode.tesseract.android.TessBaseAPI;
@@ -52,6 +56,8 @@ import org.opencv.core.Size;
 import org.opencv.features2d.MSER;
 import org.opencv.imgproc.Imgproc;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -325,7 +331,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         } else {
             Mat mat = mGrey.clone();
             TestUtils.saveImage(mat);
-            addSourceBitmap(OpenCVUtils.createSourceBitmap("1RGB source", mRgba.clone()));
+            addSourceBitmap(OpenCVUtils.createSourceBitmap("000 1RGB source", mRgba.clone()));
 
             if (initial) {
                 Mat tmp = imagePostProcessing(mat);
@@ -387,22 +393,22 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         //Imgproc.GaussianBlur(mat, mat, new Size(3, 3), 0);
         Imgproc.medianBlur(mat, mat, 3);
 
-        addSourceBitmap(OpenCVUtils.createSourceBitmap("1/3 post median blur", mat));
+        addSourceBitmap(OpenCVUtils.createSourceBitmap("000 1/3 post median blur", mat));
 
         Imgproc.adaptiveThreshold(mat, mat, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 5, 4);
 
-        addSourceBitmap(OpenCVUtils.createSourceBitmap("2/3 post adaptive threshold", mat));
+        addSourceBitmap(OpenCVUtils.createSourceBitmap("000 2/3 post adaptive threshold", mat));
 
         Imgproc.threshold(mat, mat, 0, 255, Imgproc.THRESH_OTSU);
 
-        addSourceBitmap(OpenCVUtils.createSourceBitmap("3/3 post otsu threshold", mat));
+        addSourceBitmap(OpenCVUtils.createSourceBitmap("000 3/3 post otsu threshold", mat));
 
         //    Imgproc.adaptiveThreshold(tmp, tmp, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
         return mat;
     }
 
     private void recognizeMat(Mat mat) {
-        addSourceBitmap(new SourceBitmap("full image source", mSavedSource)); // full image source
+        addSourceBitmap(new SourceBitmap("000 full image source", mSavedSource)); // full image source
 
         mIntermediateMat = mat;
 
@@ -437,7 +443,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                 Mat croppedPart;
                 croppedPart = regionsSubmat.submat(contourRect);
                 bmp = regionDeskew(croppedPart, i);
-                //bmp = OpenCVUtils.createBitmap(croppedPart);
+//                bmp = OpenCVUtils.createBitmap(croppedPart);
             } catch (Exception e) {
                 Log.d(TAG, "cropped part data error " + e.getMessage());
             }
@@ -446,7 +452,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             }
         }
 
-        addSourceBitmap(OpenCVUtils.createSourceBitmap("1regions", regionsSubmat));
+        addSourceBitmap(OpenCVUtils.createSourceBitmap("000 all regions", regionsSubmat));
 
         if (isTest && optimalRegionsNumber == 0) {
             optimalRegionsNumber = bitmapsToRecognize.size();
@@ -481,9 +487,45 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         dialog.setProgress(0);
         dialog.show();
 
+
+        mCurrentTimeStamp = Utils.getCurrentTimestamp();
+
+        if (isTest) {
+            folderName = getTestFolderPrefix() + " " + mCurrentTimeStamp + " openCV";
+        } else {
+            folderName = mCurrentTimeStamp + " openCV";
+        }
+
+        List<BitmapRegion> localRegions = new ArrayList<>();
+        for (BitmapRegion r : regions) {
+            localRegions.add(new BitmapRegion(r.getRegionNumber(),
+                    r.getBitmap().copy(r.getBitmap().getConfig(), r.getBitmap().isMutable())));
+        }
+
+        List<SourceBitmap> localSourceImages = new ArrayList<>();
+        for (SourceBitmap s : mCurrentSourceBitmaps) {
+            localSourceImages.add(new SourceBitmap(s.getName(),
+                    s.getBitmap().copy(s.getBitmap().getConfig(), s.getBitmap().isMutable())));
+        }
+
+        for (int i = 0; i < regions.size(); i++) {
+            BitmapRegion region = regions.get(i);
+            saveImageLocally(region.getBitmap(), "region #" + region.getRegionNumber(), folderName);
+        }
+
+        if (localSourceImages.size() > 0) {
+            for (int i = 0; i < localSourceImages.size(); i++) {
+                SourceBitmap source = localSourceImages.get(i);
+                saveImageLocally(source.getBitmap(), source.getName(), folderName);
+            }
+        }
+
+//        sendBroadcast(new Intent(Intent.ACTION_MEDIA_MOUNTED, Uri.parse("file://" + Environment.getExternalStorageDirectory())));
+
+
         Observable.create((Action1<Emitter<Void>>) emitter -> {
             addRegionBitmaps(regions);
-            uploadAllBitmaps(); // uploads all collected region bitmaps + source bitmaps together
+            uploadAllBitmaps(localRegions, localSourceImages); // uploads all collected region bitmaps + source bitmaps together
             emitter.onCompleted();
         }, Emitter.BackpressureMode.LATEST)
                 .subscribeOn(Schedulers.newThread())
@@ -499,7 +541,8 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
                 .flatMap(Observable::just)
                 .subscribeOn(Schedulers.newThread())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(bitmapRegion -> Observable.create((Action1<Emitter<RecognizedRegion>>) emitter -> {
+                .subscribe(bitmapRegion ->
+                 Observable.create((Action1<Emitter<RecognizedRegion>>) emitter -> {
                     RecognizedRegion region = mTesseract.processImage(bitmapRegion);
                     emitter.onNext(region);
                 }, Emitter.BackpressureMode.LATEST)
@@ -531,9 +574,9 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
     }
 
     private void resetCurrentDriveData() {
-        mCurrentTimeStamp = null;
-        mCurrentBitmapRegions = new ArrayList<>();
-        mCurrentSourceBitmaps = new ArrayList<>();
+//        mCurrentTimeStamp = null;
+//        mCurrentBitmapRegions = new ArrayList<>();
+//        mCurrentSourceBitmaps = new ArrayList<>();
     }
 
     private void showResultsDialog(ArrayList<RecognizedRegion> results) {
@@ -558,7 +601,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             builder.append("\n");
         }
 
-        uploadResultsToGoogleDrive(builder.toString(), folderName, "1results");
+    //    uploadResultsToGoogleDrive(builder.toString(), folderName, "1results");
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.results)
@@ -680,7 +723,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
     private Bitmap textDeskew(Mat mat) {
         Bitmap sourceImage = OpenCVUtils.createBitmap(mat);
-        addSourceBitmap(new SourceBitmap("cropped pre-deskew image", sourceImage));
+        addSourceBitmap(new SourceBitmap("000 cropped pre-deskew image", sourceImage));
 
         Mat source = mat.clone();
 
@@ -689,18 +732,18 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         Imgproc.adaptiveThreshold(mat, mat, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 15, 40);
         //Imgproc.threshold(greyscale, greyscale, 200, 255, Imgproc.THRESH_BINARY);
 
-        addSourceBitmap(OpenCVUtils.createSourceBitmap("deskew 1/5 ", mat));
+        addSourceBitmap(OpenCVUtils.createSourceBitmap("000 deskew 1/5 ", mat));
 
         //Invert the colors (because objects are represented as white pixels, and the background is represented by black pixels)
         Core.bitwise_not(mat, mat);
         Mat element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(3, 3));
 
-        addSourceBitmap(OpenCVUtils.createSourceBitmap("deskew 2/5", mat));
+        addSourceBitmap(OpenCVUtils.createSourceBitmap("000 deskew 2/5", mat));
 
         //We can now perform our erosion, we must declare our rectangle-shaped structuring element and call the erode function
         Imgproc.erode(mat, mat, element);
 
-        addSourceBitmap(OpenCVUtils.createSourceBitmap("deskew 3/5", mat));
+        addSourceBitmap(OpenCVUtils.createSourceBitmap("000 deskew 3/5", mat));
 
         //Find all white pixels
         Mat wLocMat = Mat.zeros(mat.size(), mat.type());
@@ -723,7 +766,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             boxContours.add(new MatOfPoint(vertices));
             Imgproc.drawContours(mat, boxContours, 0, new Scalar(128, 128, 128), -1);
 
-            addSourceBitmap(OpenCVUtils.createSourceBitmap("deskew 4/5", mat));
+            addSourceBitmap(OpenCVUtils.createSourceBitmap("000 deskew 4/5", mat));
 
             // always landscape orientation!
             rotatedRect.angle = rotatedRect.angle < -45 ? rotatedRect.angle + 90.f : rotatedRect.angle;
@@ -733,7 +776,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
 
             Bitmap bitmap = OpenCVUtils.createBitmap(result);
 
-            addSourceBitmap(new SourceBitmap("deskew 5/5", bitmap));
+            addSourceBitmap(new SourceBitmap("000 deskew 5/5", bitmap));
 
             return bitmap;
         } catch (Exception e) {
@@ -766,7 +809,7 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
         }
     }
 
-    public void uploadAllBitmaps() {
+    public void uploadAllBitmaps(List<BitmapRegion> regions, List<SourceBitmap> sourceBitmaps) {
         if (TextUtils.isEmpty(mCurrentTimeStamp)) {
             mCurrentTimeStamp = Utils.getCurrentTimestamp();
 
@@ -812,6 +855,24 @@ public class OpenCVActivity extends AppCompatActivity implements CameraBridgeVie
             return DriveUtils.createImage(contents, image, name, folder, mDriveResourceClient);
         })
                 .addOnFailureListener(this, e -> Log.e(TAG, "Unable to create file", e));
+
+    private void saveImageLocally(Bitmap image, String name, String folderName) {
+        String root = Environment.getExternalStorageDirectory().toString();
+        File dir = new File(root + "/openCV/" + folderName);
+        dir.mkdirs();
+        name = name.replace("/", "|") + ".jpg";
+        File file = new File(dir, name);
+        Log.i(TAG, "" + file);
+        if (file.exists())
+            file.delete();
+        try {
+            FileOutputStream out = new FileOutputStream(file);
+            image.compress(Bitmap.CompressFormat.JPEG, 100, out);
+            out.flush();
+            out.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void test() {
